@@ -14,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/store/AuthContext';
 import { useApp } from '../../src/store/AppContext';
 import { League, Sport, Team } from '../../src/types';
@@ -24,6 +24,7 @@ type CreateMode = 'team' | 'league' | null;
 type DeleteTarget = { kind: 'team'; item: Team } | { kind: 'league'; item: League } | null;
 
 export default function DashboardScreen() {
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const { user, signOut, updateDisplayName } = useAuth();
   const { teams, leagues, loading, createTeam, removeTeam, hideTeam, createLeague, removeLeague } = useApp();
   const [createMode, setCreateMode] = useState<CreateMode>(null);
@@ -279,7 +280,7 @@ export default function DashboardScreen() {
         </Pressable>
       </Modal>
 
-      <Text style={styles.versionLabel}>{appVersion()}</Text>
+      <Text style={[styles.versionLabel, { bottom: Math.max(bottomInset, 10) }]}>{appVersion()}</Text>
     </SafeAreaView>
   );
 }
@@ -498,7 +499,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f7f5' },
   versionLabel: {
     position: 'absolute',
-    bottom: 10,
     left: 16,
     fontSize: 11,
     color: '#bbb',
