@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/store/AuthContext';
 import { useApp } from '../../src/store/AppContext';
 import { League, Sport, Team } from '../../src/types';
+import { appVersion } from '../../src/utils/version';
 
 type CreateMode = 'team' | 'league' | null;
 type DeleteTarget = { kind: 'team'; item: Team } | { kind: 'league'; item: League } | null;
@@ -277,6 +278,8 @@ export default function DashboardScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Text style={styles.versionLabel}>{appVersion()}</Text>
     </SafeAreaView>
   );
 }
@@ -493,6 +496,14 @@ function CreateModal({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f7f5' },
+  versionLabel: {
+    position: 'absolute',
+    bottom: 10,
+    left: 16,
+    fontSize: 11,
+    color: '#bbb',
+    fontWeight: '500',
+  },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f7f7f5' },
   header: {
     flexDirection: 'row',
