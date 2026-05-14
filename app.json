@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "ballplan-scaffold",
-    "slug": "ballplan-scaffold",
+    "name": "ScoreBall",
+    "slug": "scoreball",
+    "scheme": "scoreball",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,17 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.986759576199-tjamd2ash65jknqr2ici82h2suvtmm60"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,6 +36,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-web-browser"
+    ]
   }
 }
