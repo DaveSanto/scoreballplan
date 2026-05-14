@@ -280,7 +280,7 @@ export default function DashboardScreen() {
         </Pressable>
       </Modal>
 
-      <Text style={[styles.versionLabel, { bottom: Math.max(bottomInset, 10) }]}>{appVersion()}</Text>
+      <Text style={[styles.versionLabel, { bottom: Math.max(bottomInset, 10) }]}>ScoreBall {appVersion()}</Text>
     </SafeAreaView>
   );
 }
