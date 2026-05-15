@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { useApp } from '../../../../src/store/AppContext';
 import { useAuth } from '../../../../src/store/AuthContext';
 import { createScorecard, subscribeToTeamGames } from '../../../../src/firebase/db';
@@ -83,14 +84,13 @@ export default function GamePlanScreen() {
 
   const teamPlayers = getTeamPlayers(teamId);
   const isAdmin = user?.uid === team.ownerId || (team.coAdminIds ?? []).includes(user?.uid ?? '');
+  const today = todayISO();
+  const selectedGame = games.find((g) => g.id === selectedGameId);
   // Per-game availability (set from Schedule tab) takes priority over the team-level field
   const absent = selectedGame?.absentPlayerIds ?? team.absentPlayerIds ?? [];
   const activePlayers = team.battingOrder
     .map((id) => teamPlayers.find((p) => p.id === id))
     .filter((p): p is Player => !!p && !absent.includes(p.id));
-
-  const today = todayISO();
-  const selectedGame = games.find((g) => g.id === selectedGameId);
 
   async function handleStartScorecard() {
     if (!user || !selectedGameId || startingScorecard) return;
@@ -280,68 +280,65 @@ function BattingOrderView({
     );
   }
 
-  return (
-    <ScrollView contentContainerStyle={styles.list}>
-      {players.length === 0 && (
-        <View style={[styles.empty, { flex: 0, paddingVertical: 24 }]}>
-          <Text style={styles.emptyText}>No active players. Manage availability in the Schedule tab.</Text>
-        </View>
-      )}
-      {players.map((player, index) => (
-        <View key={player.id} style={styles.orderRow}>
+  if (players.length === 0) {
+    return (
+      <View style={[styles.empty, { flex: 0, paddingVertical: 24 }]}>
+        <Text style={styles.emptyText}>No active players. Manage availability in the Schedule tab.</Text>
+      </View>
+    );
+  }
+
+  function renderItem({ item: player, getIndex, drag, isActive }: RenderItemParams<Player>) {
+    const index = getIndex() ?? 0;
+    return (
+      <ScaleDecorator activeScale={1.03}>
+        <Pressable
+          onLongPress={drag}
+          delayLongPress={150}
+          style={[styles.orderRow, isActive && styles.orderRowDragging]}
+        >
+          <Ionicons name="reorder-three-outline" size={20} color="#ccc" style={styles.dragHandle} />
           <Text style={styles.orderNum}>{index + 1}</Text>
           <View style={styles.badge}>
             <Text style={styles.badgeNum}>#{player.number || '—'}</Text>
           </View>
           <Text style={styles.playerName}>{player.name}</Text>
-          <View style={styles.arrows}>
-            <Pressable
-              style={[styles.arrowBtn, index === 0 && styles.arrowDisabled]}
-              onPress={() => {
-                const realFrom = battingOrder.indexOf(player.id);
-                const prevActive = players[index - 1];
-                const realTo = prevActive ? battingOrder.indexOf(prevActive.id) : 0;
-                onMove(realFrom, realTo);
-              }}
-              disabled={index === 0}
-            >
-              <Ionicons name="chevron-up" size={18} color={index === 0 ? '#ccc' : '#1a5c2e'} />
-            </Pressable>
-            <Pressable
-              style={[styles.arrowBtn, index === players.length - 1 && styles.arrowDisabled]}
-              onPress={() => {
-                const realFrom = battingOrder.indexOf(player.id);
-                const nextActive = players[index + 1];
-                const realTo = nextActive ? battingOrder.indexOf(nextActive.id) : battingOrder.length - 1;
-                onMove(realFrom, realTo);
-              }}
-              disabled={index === players.length - 1}
-            >
-              <Ionicons
-                name="chevron-down"
-                size={18}
-                color={index === players.length - 1 ? '#ccc' : '#1a5c2e'}
-              />
-            </Pressable>
-          </View>
-        </View>
-      ))}
+        </Pressable>
+      </ScaleDecorator>
+    );
+  }
 
-      {absentPlayers.length > 0 && (
-        <>
-          <Text style={styles.absentSection}>Sitting out ({absentPlayers.length})</Text>
-          {absentPlayers.map((player) => (
-            <View key={player.id} style={[styles.orderRow, styles.orderRowAbsent]}>
-              <Text style={[styles.orderNum, { color: '#ccc' }]}>—</Text>
-              <View style={[styles.badge, styles.badgeAbsent]}>
-                <Text style={styles.badgeNum}>#{player.number || '—'}</Text>
+  return (
+    <DraggableFlatList
+      data={players}
+      keyExtractor={(p) => p.id}
+      contentContainerStyle={styles.list}
+      onDragEnd={({ from, to }) => {
+        const fromPlayer = players[from];
+        const toPlayer = players[to];
+        const realFrom = battingOrder.indexOf(fromPlayer.id);
+        const realTo = battingOrder.indexOf(toPlayer.id);
+        onMove(realFrom, realTo);
+      }}
+      renderItem={renderItem}
+      ListFooterComponent={
+        absentPlayers.length > 0 ? (
+          <View>
+            <Text style={styles.absentSection}>Sitting out ({absentPlayers.length})</Text>
+            {absentPlayers.map((player) => (
+              <View key={player.id} style={[styles.orderRow, styles.orderRowAbsent]}>
+                <View style={{ width: 28 }} />
+                <Text style={[styles.orderNum, { color: '#ccc' }]}>—</Text>
+                <View style={[styles.badge, styles.badgeAbsent]}>
+                  <Text style={styles.badgeNum}>#{player.number || '—'}</Text>
+                </View>
+                <Text style={[styles.playerName, { color: '#aaa' }]}>{player.name}</Text>
               </View>
-              <Text style={[styles.playerName, { color: '#aaa' }]}>{player.name}</Text>
-            </View>
-          ))}
-        </>
-      )}
-    </ScrollView>
+            ))}
+          </View>
+        ) : null
+      }
+    />
   );
 }
 
@@ -741,9 +738,14 @@ const styles = StyleSheet.create({
   badgeAbsent: { backgroundColor: '#ccc' },
   badgeNum: { color: '#fff', fontWeight: '700', fontSize: 12 },
   playerName: { flex: 1, fontSize: 15, fontWeight: '500', color: '#1a1a1a' },
-  arrows: { flexDirection: 'row', gap: 2 },
-  arrowBtn: { padding: 6 },
-  arrowDisabled: { opacity: 0.3 },
+  dragHandle: { marginRight: 4 },
+  orderRowDragging: {
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
   absentSection: {
     fontSize: 11, fontWeight: '700', color: '#aaa',
     textTransform: 'uppercase', letterSpacing: 0.5,
