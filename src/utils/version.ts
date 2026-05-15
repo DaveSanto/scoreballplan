@@ -9,12 +9,11 @@ export function appVersion(): string {
   const [major, minor] = raw.split('.');
   const v = `${major}.${minor ?? '0'}`;
 
-  let revision: string | number | null = null;
-  if (Platform.OS === 'ios') {
-    revision = config?.ios?.buildNumber ?? null;
-  } else if (Platform.OS === 'android') {
-    revision = config?.android?.versionCode ?? null;
-  }
+  // Use platform-specific build number; fall back to iOS buildNumber on web
+  const revision =
+    Platform.OS === 'android'
+      ? config?.android?.versionCode
+      : config?.ios?.buildNumber;
 
   return revision != null ? `v${v} r${revision}` : `v${v}`;
 }
