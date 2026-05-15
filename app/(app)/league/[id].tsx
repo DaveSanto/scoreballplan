@@ -219,7 +219,7 @@ function parseLeagueTeamsCsv(csv: string, existingNames: string[]): ParsedLeague
 export default function LeagueScreen() {
   const { id: leagueId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { leagues, teams, getTeamPlayers, addTeamToLeague, removeTeamFromLeague } = useApp();
+  const { leagues, teams, hiddenTeams, getTeamPlayers, addTeamToLeague, removeTeamFromLeague, unhideTeam } = useApp();
   const league = leagues.find((l) => l.id === leagueId);
   const [activeTab, setActiveTab] = useState<Tab>('teams');
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
@@ -234,6 +234,7 @@ export default function LeagueScreen() {
   }
 
   const leagueTeams = teams.filter((t) => league.teamIds.includes(t.id));
+  const hiddenLeagueTeams = hiddenTeams.filter((t) => league.teamIds.includes(t.id));
   const availableTeams = teams.filter((t) => !league.teamIds.includes(t.id));
   const pendingCount = invites.filter((i) => i.status === 'pending').length;
 
@@ -262,9 +263,11 @@ export default function LeagueScreen() {
           leagueName={league.name}
           leagueSport={league.sport}
           leagueTeams={leagueTeams}
+          hiddenLeagueTeams={hiddenLeagueTeams}
           availableTeams={availableTeams}
           getTeamPlayers={getTeamPlayers}
           onAddTeam={(teamId) => addTeamToLeague(leagueId, teamId)}
+          onUnhideTeam={unhideTeam}
           onRemoveTeam={(teamId) =>
             Alert.alert('Remove Team', 'Remove this team from the league?', [
               { text: 'Cancel', style: 'cancel' },
@@ -349,9 +352,11 @@ function TeamsTab({
   leagueName,
   leagueSport,
   leagueTeams,
+  hiddenLeagueTeams,
   availableTeams,
   getTeamPlayers,
   onAddTeam,
+  onUnhideTeam,
   onRemoveTeam,
   onBulkCreateTeams,
 }: {
@@ -359,9 +364,11 @@ function TeamsTab({
   leagueName: string;
   leagueSport: Sport;
   leagueTeams: Team[];
+  hiddenLeagueTeams: Team[];
   availableTeams: Team[];
   getTeamPlayers: (teamId: string) => any[];
   onAddTeam: (teamId: string) => Promise<void>;
+  onUnhideTeam: (teamId: string) => Promise<void>;
   onRemoveTeam: (teamId: string) => void;
   onBulkCreateTeams: (rows: ParsedLeagueTeam[]) => Promise<void>;
 }) {
@@ -449,7 +456,7 @@ function TeamsTab({
         </View>
       </View>
 
-      {leagueTeams.length === 0 ? (
+      {leagueTeams.length === 0 && hiddenLeagueTeams.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="people-outline" size={44} color="#ccc" />
           <Text style={styles.emptyText}>No teams yet.</Text>
@@ -471,6 +478,29 @@ function TeamsTab({
           data={leagueTeams}
           keyExtractor={(t) => t.id}
           contentContainerStyle={styles.list}
+          ListFooterComponent={
+            hiddenLeagueTeams.length > 0 ? (
+              <View style={{ marginTop: 8 }}>
+                <Text style={styles.hiddenSectionLabel}>Hidden from your dashboard</Text>
+                {hiddenLeagueTeams.map((item) => (
+                  <View key={item.id} style={styles.hiddenTeamRow}>
+                    <Text style={styles.sportEmoji}>{item.sport === 'softball' ? '🥎' : '⚾'}</Text>
+                    <View style={styles.teamInfo}>
+                      <Text style={[styles.teamName, { color: '#aaa' }]}>{item.name}</Text>
+                      <Text style={styles.teamMeta}>{item.playerIds.length} players</Text>
+                    </View>
+                    <Pressable
+                      style={styles.unhideBtn}
+                      onPress={() => onUnhideTeam(item.id)}
+                    >
+                      <Ionicons name="eye-outline" size={14} color="#1a5c2e" />
+                      <Text style={styles.unhideBtnText}>Show</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => (
             <Pressable
               style={styles.teamRow}
@@ -1614,6 +1644,12 @@ const styles = StyleSheet.create({
   csvBtnGroupText: { fontSize: 12, fontWeight: '600', color: '#555' },
   csvBtnGroupDivider: { width: 1, height: '100%', backgroundColor: '#ddd' },
   csvBtnGroupRight: { paddingVertical: 5, paddingHorizontal: 8 },
+
+  // Hidden league teams
+  hiddenSectionLabel: { fontSize: 11, fontWeight: '700', color: '#bbb', textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 4, paddingBottom: 6, marginTop: 4 },
+  hiddenTeamRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fafaf8', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, gap: 12, marginBottom: 8, borderWidth: 1, borderColor: '#ebebea' },
+  unhideBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderColor: '#1a5c2e', borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10 },
+  unhideBtnText: { fontSize: 12, color: '#1a5c2e', fontWeight: '600' },
 
   // League teams import
   teamsImportRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f5f5f4', gap: 8 },

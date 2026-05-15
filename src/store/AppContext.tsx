@@ -6,6 +6,7 @@ import {
   updateTeam as dbUpdateTeam,
   deleteTeam as dbDeleteTeam,
   hideTeamFromView as dbHideTeam,
+  unhideTeamFromView as dbUnhideTeam,
   subscribeToTeams,
   subscribeToTeamsByCoAdmin,
   subscribeToTeamsByViewer,
@@ -24,6 +25,7 @@ import {
 
 type AppContextType = {
   teams: Team[];
+  hiddenTeams: Team[];
   leagues: League[];
   players: Player[];
   loading: boolean;
@@ -33,6 +35,7 @@ type AppContextType = {
   renameTeam: (teamId: string, name: string) => Promise<void>;
   removeTeam: (teamId: string) => Promise<void>;
   hideTeam: (teamId: string) => Promise<void>;
+  unhideTeam: (teamId: string) => Promise<void>;
 
   // Leagues
   createLeague: (name: string, sport: Sport, season: string) => Promise<string>;
@@ -74,6 +77,7 @@ export function AppProvider({
   userId: string;
 }) {
   const [teams, setTeams] = useState<Team[]>([]);
+  const [hiddenTeams, setHiddenTeams] = useState<Team[]>([]);
   const [leagues, setLeagues] = useState<League[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,8 +129,9 @@ export function AppProvider({
       for (const t of ownedTeams) {
         if (!seen.has(t.id)) { seen.add(t.id); merged.push(t); }
       }
-      // Filter out teams this user has hidden from their view
+      // Separate visible from hidden
       setTeams(merged.filter((t) => !(t.hiddenFor ?? []).includes(userId)));
+      setHiddenTeams(merged.filter((t) => (t.hiddenFor ?? []).includes(userId)));
       loadedRef.current.teams = true;
       checkDone();
     };
@@ -235,6 +240,11 @@ export function AppProvider({
 
   const hideTeam = useCallback(
     (teamId: string) => dbHideTeam(teamId, userId),
+    [userId]
+  );
+
+  const unhideTeam = useCallback(
+    (teamId: string) => dbUnhideTeam(teamId, userId),
     [userId]
   );
 
@@ -423,6 +433,7 @@ export function AppProvider({
     <AppContext.Provider
       value={{
         teams,
+        hiddenTeams,
         leagues,
         players,
         loading,
@@ -430,6 +441,7 @@ export function AppProvider({
         renameTeam,
         removeTeam,
         hideTeam,
+        unhideTeam,
         createLeague,
         renameLeague,
         removeLeague,

@@ -10,6 +10,7 @@ import {
   query,
   where,
   arrayUnion,
+  arrayRemove,
   serverTimestamp,
   Timestamp,
   Unsubscribe,
@@ -57,6 +58,10 @@ export async function deleteTeam(teamId: string): Promise<void> {
 
 export async function hideTeamFromView(teamId: string, userId: string): Promise<void> {
   await updateDoc(doc(db, 'teams', teamId), { hiddenFor: arrayUnion(userId) });
+}
+
+export async function unhideTeamFromView(teamId: string, userId: string): Promise<void> {
+  await updateDoc(doc(db, 'teams', teamId), { hiddenFor: arrayRemove(userId) });
 }
 
 export function subscribeToTeams(ownerId: string, onUpdate: (teams: Team[]) => void): Unsubscribe {
