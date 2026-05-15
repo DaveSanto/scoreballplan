@@ -42,6 +42,9 @@
     "plugins": [
       "expo-router",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "buildRevision": 2
+    }
   }
 }

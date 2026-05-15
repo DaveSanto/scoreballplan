@@ -1,5 +1,4 @@
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 
 export function appVersion(): string {
   const config = Constants.expoConfig;
@@ -9,11 +8,8 @@ export function appVersion(): string {
   const [major, minor] = raw.split('.');
   const v = `${major}.${minor ?? '0'}`;
 
-  // Use platform-specific build number; fall back to iOS buildNumber on web
-  const revision =
-    Platform.OS === 'android'
-      ? config?.android?.versionCode
-      : config?.ios?.buildNumber;
+  // extra.buildRevision is available on all platforms (ios/android/web)
+  const revision = config?.extra?.buildRevision;
 
   return revision != null ? `v${v} r${revision}` : `v${v}`;
 }
