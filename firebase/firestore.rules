@@ -93,8 +93,8 @@ service cloud.firestore {
     match /surveys/{surveyId}/votes/{voteId} {
       // Anyone can read results
       allow read: if true;
-      // Anyone can vote — require hat and name to be present
-      allow write: if request.resource.data.keys().hasAll(['hat', 'name']);
+      // Anyone can vote — require name to be present
+      allow write: if request.resource.data.get('name', '') != '';
     }
 
   }
