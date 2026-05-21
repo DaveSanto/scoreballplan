@@ -93,9 +93,11 @@ export default function HistoryScreen() {
                 <View style={styles.cardHeaderLeft}>
                   <Text style={styles.cardDate}>{formatDate(game.date)}</Text>
                   <Text style={styles.cardMatchup}>
-                    {game.isHome
+                    {game.isHome === true
                       ? `${team.name} vs. ${game.opponent}`
-                      : `${team.name} @ ${game.opponent}`}
+                      : game.isHome === false
+                      ? `${team.name} @ ${game.opponent}`
+                      : `${team.name} vs. ${game.opponent} (TBD)`}
                   </Text>
                   {game.location ? (
                     <Text style={styles.cardLocation}>{game.location}</Text>

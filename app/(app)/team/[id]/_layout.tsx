@@ -4,9 +4,11 @@ import { router, Tabs, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GameRulesModal } from '../../../../src/components/GameRulesModal';
 import { createTeamInvite } from '../../../../src/firebase/db';
 import { useApp } from '../../../../src/store/AppContext';
 import { useAuth } from '../../../../src/store/AuthContext';
+import { DEFAULT_RULES } from '../../../../src/types';
 
 const VISIBLE_TABS = ['index', 'schedule', 'game-plan', 'history'];
 const TAB_LABELS: Record<string, string> = {
@@ -22,12 +24,16 @@ function TeamHeader({
   onShare,
   sharing,
   isOwner,
+  isAdmin,
+  onOpenFormat,
 }: {
   navigation: any;
   teamName: string;
   onShare: () => void;
   sharing: boolean;
   isOwner: boolean;
+  isAdmin: boolean;
+  onOpenFormat: () => void;
 }) {
   const state = navigation.getState();
   const visibleRoutes = (state.routes as any[]).filter((r) => VISIBLE_TABS.includes(r.name));
@@ -40,15 +46,22 @@ function TeamHeader({
           <Ionicons name="chevron-back" size={24} color="#1a5c2e" />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{teamName}</Text>
-        {isOwner ? (
-          <Pressable onPress={onShare} style={styles.backBtn} disabled={sharing}>
-            {sharing
-              ? <ActivityIndicator size="small" color="#1a5c2e" />
-              : <Ionicons name="share-outline" size={22} color="#1a5c2e" />}
-          </Pressable>
-        ) : (
-          <View style={styles.backBtn} />
-        )}
+        <View style={styles.headerActions}>
+          {isAdmin && (
+            <Pressable onPress={onOpenFormat} style={styles.actionBtn}>
+              <Ionicons name="options-outline" size={22} color="#1a5c2e" />
+            </Pressable>
+          )}
+          {isOwner ? (
+            <Pressable onPress={onShare} style={styles.actionBtn} disabled={sharing}>
+              {sharing
+                ? <ActivityIndicator size="small" color="#1a5c2e" />
+                : <Ionicons name="share-outline" size={22} color="#1a5c2e" />}
+            </Pressable>
+          ) : (
+            <View style={styles.actionBtn} />
+          )}
+        </View>
       </View>
       <View style={styles.tabBarOuter}>
         <View style={styles.segmented}>
@@ -74,11 +87,13 @@ function TeamHeader({
 
 export default function TeamLayout() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { teams } = useApp();
+  const { teams, getEffectiveRules, setTeamRules } = useApp();
   const { user } = useAuth();
   const team = teams.find((t) => t.id === id);
   const isOwner = team?.ownerId === user?.uid;
+  const isAdmin = isOwner || (team?.coAdminIds ?? []).includes(user?.uid ?? '');
   const [sharing, setSharing] = useState(false);
+  const [rulesModalOpen, setRulesModalOpen] = useState(false);
 
   async function doShare(role: 'editor' | 'viewer') {
     if (!team || !user) return;
@@ -102,27 +117,43 @@ export default function TeamLayout() {
     ]);
   }
 
+  const effectiveRules = team ? getEffectiveRules(team.id) : DEFAULT_RULES;
+
   return (
-    <Tabs
-      tabBar={() => null}
-      screenOptions={({ navigation }) => ({
-        header: () => (
-          <TeamHeader
-            navigation={navigation}
-            teamName={team?.name ?? 'Team'}
-            onShare={handleShare}
-            sharing={sharing}
-            isOwner={isOwner}
-          />
-        ),
-      })}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="schedule" />
-      <Tabs.Screen name="game-plan" />
-      <Tabs.Screen name="history" />
-      <Tabs.Screen name="scoresheet" options={{ href: null }} />
-    </Tabs>
+    <>
+      <Tabs
+        tabBar={() => null}
+        screenOptions={({ navigation }) => ({
+          header: () => (
+            <TeamHeader
+              navigation={navigation}
+              teamName={team?.name ?? 'Team'}
+              onShare={handleShare}
+              sharing={sharing}
+              isOwner={isOwner}
+              isAdmin={isAdmin}
+              onOpenFormat={() => setRulesModalOpen(true)}
+            />
+          ),
+        })}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="schedule" />
+        <Tabs.Screen name="game-plan" />
+        <Tabs.Screen name="history" />
+        <Tabs.Screen name="scoresheet" options={{ href: null }} />
+      </Tabs>
+
+      {team && (
+        <GameRulesModal
+          visible={rulesModalOpen}
+          rules={effectiveRules}
+          title={`${team.name} — Game Format`}
+          onSave={(rules) => setTeamRules(team.id, rules)}
+          onClose={() => setRulesModalOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -139,6 +170,16 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     width: 48,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionBtn: {
+    width: 40,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',

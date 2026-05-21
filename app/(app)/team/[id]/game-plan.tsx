@@ -12,11 +12,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
 import { useApp } from '../../../../src/store/AppContext';
 import { useAuth } from '../../../../src/store/AuthContext';
-import { createScorecard, subscribeToTeamGames } from '../../../../src/firebase/db';
-import { ALL_POSITIONS, Player, Position, PositionRotation, TeamGame } from '../../../../src/types';
+import { BattingOrderView } from '../../../../src/components/BattingOrderView';
+import { createScorecard, subscribeToTeamGames, updateTeamGame } from '../../../../src/firebase/db';
+import { ALL_POSITIONS, POSITIONS_BY_FIELD_COUNT, Player, Position, PositionRotation, TeamGame } from '../../../../src/types';
 import { generateRotation } from '../../../../src/utils/rotation';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,9 +49,11 @@ function formatGameLabel(game: TeamGame, teamName: string): string {
   const datePart = isNaN(d.getTime())
     ? game.date
     : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const matchup = game.isHome
+  const matchup = game.isHome === true
     ? `${teamName} vs. ${game.opponent}`
-    : `${teamName} @ ${game.opponent}`;
+    : game.isHome === false
+    ? `${teamName} @ ${game.opponent}`
+    : `${teamName} vs. ${game.opponent} (TBD)`;
   return `${datePart} · ${matchup}`;
 }
 
@@ -62,7 +64,7 @@ type Tab = 'order' | 'rotation';
 export default function GamePlanScreen() {
   const { id: teamId } = useGlobalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { teams, getTeamPlayers, moveBattingOrder, setInnings } = useApp();
+  const { teams, getTeamPlayers, moveBattingOrder, setInnings, getEffectiveRules } = useApp();
   const team = teams.find((t) => t.id === teamId);
 
   const [activeTab, setActiveTab] = useState<Tab>('order');
@@ -70,27 +72,45 @@ export default function GamePlanScreen() {
   const [selectedGameId, setSelectedGameId] = useState<string | 'impromptu' | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [startingScorecard, setStartingScorecard] = useState(false);
+  const [benchedIds, setBenchedIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!teamId) return;
     return subscribeToTeamGames(teamId, (g) =>
-      setGames(g.sort((a, b) => a.date.localeCompare(b.date)))
+      setGames(g.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()))
     );
   }, [teamId]);
+
+  // Sync bench state when selected game changes
+  useEffect(() => {
+    const game = games.find((g) => g.id === selectedGameId);
+    setBenchedIds(game?.benchedPlayerIds ?? []);
+  }, [selectedGameId, games]);
 
   if (!team) {
     return <View style={styles.loader}><ActivityIndicator color="#1a5c2e" /></View>;
   }
 
+  const rules = getEffectiveRules(teamId);
   const teamPlayers = getTeamPlayers(teamId);
   const isAdmin = user?.uid === team.ownerId || (team.coAdminIds ?? []).includes(user?.uid ?? '');
   const today = todayISO();
   const selectedGame = games.find((g) => g.id === selectedGameId);
-  // Per-game availability (set from Schedule tab) takes priority over the team-level field
   const absent = selectedGame?.absentPlayerIds ?? team.absentPlayerIds ?? [];
+  // activePlayers excludes both absent (pre-game) and benched (in-game)
   const activePlayers = team.battingOrder
     .map((id) => teamPlayers.find((p) => p.id === id))
-    .filter((p): p is Player => !!p && !absent.includes(p.id));
+    .filter((p): p is Player => !!p && !absent.includes(p.id) && !benchedIds.includes(p.id));
+
+  async function toggleBench(playerId: string) {
+    const next = benchedIds.includes(playerId)
+      ? benchedIds.filter((id) => id !== playerId)
+      : [...benchedIds, playerId];
+    setBenchedIds(next);
+    if (selectedGameId && selectedGameId !== 'impromptu') {
+      await updateTeamGame(teamId, selectedGameId, { benchedPlayerIds: next });
+    }
+  }
 
   async function handleStartScorecard() {
     if (!user || !selectedGameId || startingScorecard) return;
@@ -108,7 +128,7 @@ export default function GamePlanScreen() {
         opponent: selectedGame?.opponent ?? 'Scrimmage',
         isHome: selectedGame?.isHome ?? true,
         battingOrder,
-        maxInnings: team.innings,
+        maxInnings: team!.innings,
       });
       router.push(`/(app)/scorecard/${id}`);
     } catch {
@@ -188,17 +208,6 @@ export default function GamePlanScreen() {
         </Text>
       </View>
 
-      {/* ── Absent players note ── */}
-      {absent.length > 0 && (
-        <View style={styles.absentNote}>
-          <Ionicons name="information-circle-outline" size={14} color="#e67e22" />
-          <Text style={styles.absentNoteText}>
-            {absent.length} player{absent.length !== 1 ? 's' : ''} sitting out
-            {' · '}manage availability in the Schedule tab
-          </Text>
-        </View>
-      )}
-
       {/* ── Sub-tabs ── */}
       <View style={styles.tabs}>
         {(['order', 'rotation'] as Tab[]).map((t) => (
@@ -220,12 +229,16 @@ export default function GamePlanScreen() {
           allPlayers={teamPlayers}
           battingOrder={team.battingOrder}
           absentIds={absent}
+          benchedIds={benchedIds}
+          isAdmin={isAdmin}
           onMove={(from, to) => moveBattingOrder(teamId, from, to)}
+          onToggleBench={toggleBench}
         />
       ) : (
         <RotationView
           activePlayers={activePlayers}
           innings={team.innings}
+          fieldPlayerCount={rules.fieldPlayerCount}
           onSetInnings={(n) => setInnings(teamId, n)}
         />
       )}
@@ -249,96 +262,6 @@ export default function GamePlanScreen() {
         </View>
       )}
     </SafeAreaView>
-  );
-}
-
-// ── Batting Order ─────────────────────────────────────────────────────────────
-
-function BattingOrderView({
-  players,
-  allPlayers,
-  battingOrder,
-  absentIds,
-  onMove,
-}: {
-  players: Player[];
-  allPlayers: Player[];
-  battingOrder: string[];
-  absentIds: string[];
-  onMove: (from: number, to: number) => void;
-}) {
-  const absentPlayers = battingOrder
-    .map((id) => allPlayers.find((p) => p.id === id))
-    .filter((p): p is Player => !!p && absentIds.includes(p.id));
-
-  if (allPlayers.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <Ionicons name="list-outline" size={48} color="#ccc" />
-        <Text style={styles.emptyText}>Add players on the Roster tab to set your batting order.</Text>
-      </View>
-    );
-  }
-
-  if (players.length === 0) {
-    return (
-      <View style={[styles.empty, { flex: 0, paddingVertical: 24 }]}>
-        <Text style={styles.emptyText}>No active players. Manage availability in the Schedule tab.</Text>
-      </View>
-    );
-  }
-
-  function renderItem({ item: player, getIndex, drag, isActive }: RenderItemParams<Player>) {
-    const index = getIndex() ?? 0;
-    return (
-      <ScaleDecorator activeScale={1.03}>
-        <Pressable
-          onLongPress={drag}
-          delayLongPress={150}
-          style={[styles.orderRow, isActive && styles.orderRowDragging]}
-        >
-          <Ionicons name="reorder-three-outline" size={20} color="#ccc" style={styles.dragHandle} />
-          <Text style={styles.orderNum}>{index + 1}</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeNum}>#{player.number || '—'}</Text>
-          </View>
-          <Text style={styles.playerName}>{player.name}</Text>
-        </Pressable>
-      </ScaleDecorator>
-    );
-  }
-
-  return (
-    <DraggableFlatList
-      data={players}
-      keyExtractor={(p) => p.id}
-      contentContainerStyle={styles.list}
-      onDragEnd={({ from, to }) => {
-        const fromPlayer = players[from];
-        const toPlayer = players[to];
-        const realFrom = battingOrder.indexOf(fromPlayer.id);
-        const realTo = battingOrder.indexOf(toPlayer.id);
-        onMove(realFrom, realTo);
-      }}
-      renderItem={renderItem}
-      ListFooterComponent={
-        absentPlayers.length > 0 ? (
-          <View>
-            <Text style={styles.absentSection}>Sitting out ({absentPlayers.length})</Text>
-            {absentPlayers.map((player) => (
-              <View key={player.id} style={[styles.orderRow, styles.orderRowAbsent]}>
-                <View style={{ width: 28 }} />
-                <Text style={[styles.orderNum, { color: '#ccc' }]}>—</Text>
-                <View style={[styles.badge, styles.badgeAbsent]}>
-                  <Text style={styles.badgeNum}>#{player.number || '—'}</Text>
-                </View>
-                <Text style={[styles.playerName, { color: '#aaa' }]}>{player.name}</Text>
-              </View>
-            ))}
-          </View>
-        ) : null
-      }
-    />
   );
 }
 
@@ -415,10 +338,12 @@ function PositionCell({
 function RotationView({
   activePlayers,
   innings,
+  fieldPlayerCount = 9,
   onSetInnings,
 }: {
   activePlayers: Player[];
   innings: number;
+  fieldPlayerCount?: number;
   onSetInnings: (n: number) => void;
 }) {
   const [cells, setCells] = useState<Record<string, Position | 'BENCH'>>({});
@@ -431,51 +356,69 @@ function RotationView({
 
   const activePlayerIds = activePlayers.map((p) => p.id).join(',');
   const prevActiveIdsRef = useRef<string | null>(null);
+  const prevInningsRef = useRef<number | null>(null);
+  const prevFieldPlayerCountRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const playersChanged = prevActiveIdsRef.current !== activePlayerIds;
+    const playersChanged = prevActiveIdsRef.current !== null && prevActiveIdsRef.current !== activePlayerIds;
+    const isFirstRender = prevActiveIdsRef.current === null;
+    const inningsChanged = prevInningsRef.current !== null && prevInningsRef.current !== innings;
+    const fieldCountChanged = prevFieldPlayerCountRef.current !== null && prevFieldPlayerCountRef.current !== fieldPlayerCount;
+    const prevInnings = prevInningsRef.current ?? innings;
+
     prevActiveIdsRef.current = activePlayerIds;
+    prevInningsRef.current = innings;
+    prevFieldPlayerCountRef.current = fieldPlayerCount;
 
     if (activePlayers.length < 1) {
       setCells({});
-      if (playersChanged) setLocked(new Set());
+      if (playersChanged || isFirstRender) setLocked(new Set());
       return;
     }
 
-    let currentLocked = lockedRef.current;
-
-    if (playersChanged) {
-      currentLocked = new Set();
+    // Players changed or field count changed or first render → full randomize reset
+    if (isFirstRender || playersChanged || fieldCountChanged) {
       setLocked(new Set());
-    } else {
-      const trimmed = new Set<string>();
-      for (const key of currentLocked) {
-        const inning = parseInt(key.slice(key.lastIndexOf('-') + 1), 10);
-        if (inning <= innings) trimmed.add(key);
-      }
-      if (trimmed.size !== currentLocked.size) {
-        currentLocked = trimmed;
-        setLocked(trimmed);
-      }
+      const rotation = generateRotation(activePlayers, innings, undefined, fieldPlayerCount);
+      setCells(buildCells(rotation, activePlayers, innings));
+      return;
     }
 
-    const lockedCells: Record<string, Position | 'BENCH'> = {};
-    for (const key of currentLocked) {
-      const val = cellsRef.current[key];
-      if (val !== undefined) lockedCells[key] = val;
+    // Innings decreased → just trim existing cells and locked set, no randomization
+    if (inningsChanged && innings < prevInnings) {
+      setCells((prev) => {
+        const trimmed: Record<string, Position | 'BENCH'> = {};
+        for (const [key, val] of Object.entries(prev)) {
+          const inning = parseInt(key.slice(key.lastIndexOf('-') + 1), 10);
+          if (inning <= innings) trimmed[key] = val;
+        }
+        return trimmed;
+      });
+      setLocked((prev) => {
+        const trimmed = new Set<string>();
+        for (const key of prev) {
+          const inning = parseInt(key.slice(key.lastIndexOf('-') + 1), 10);
+          if (inning <= innings) trimmed.add(key);
+        }
+        return trimmed;
+      });
+      return;
     }
 
-    const rotation = generateRotation(
-      activePlayers,
-      innings,
-      Object.keys(lockedCells).length > 0 ? lockedCells : undefined
-    );
-    const newCells = buildCells(rotation, activePlayers, innings);
-    for (const key of currentLocked) {
-      if (lockedCells[key] !== undefined) newCells[key] = lockedCells[key];
+    // Innings increased → fill new innings using generateRotation with ALL existing cells locked
+    if (inningsChanged && innings > prevInnings) {
+      const existingCells = cellsRef.current;
+      const lockedCells: Record<string, Position | 'BENCH'> = { ...existingCells };
+      const rotation = generateRotation(activePlayers, innings, lockedCells, fieldPlayerCount);
+      const newCells = buildCells(rotation, activePlayers, innings);
+      // Overlay existing cells so nothing already set ever changes
+      Object.assign(newCells, existingCells);
+      setCells(newCells);
+      return;
     }
-    setCells(newCells);
-  }, [activePlayerIds, innings]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // No structural change (e.g. re-render with same deps) → no-op
+  }, [activePlayerIds, innings, fieldPlayerCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const duplicates = useMemo(() => {
     const dupes = new Set<string>();
@@ -499,6 +442,18 @@ function RotationView({
   const hasDuplicates = duplicates.size > 0;
   const inningNumbers = Array.from({ length: innings }, (_, i) => i + 1);
 
+  const missingByInning = useMemo(() => {
+    const expected = POSITIONS_BY_FIELD_COUNT[fieldPlayerCount] ?? ALL_POSITIONS;
+    return inningNumbers.map((inning) => {
+      const assigned = new Set(
+        activePlayers
+          .map((p) => cells[`${p.id}-${inning}`])
+          .filter((v): v is Position => !!v && v !== 'BENCH')
+      );
+      return expected.filter((pos) => !assigned.has(pos));
+    });
+  }, [cells, activePlayers, innings, fieldPlayerCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleCellChange(key: string, val: Position | 'BENCH') {
     setCells((prev) => ({ ...prev, [key]: val }));
   }
@@ -519,7 +474,8 @@ function RotationView({
     const rotation = generateRotation(
       activePlayers,
       innings,
-      Object.keys(lockedCells).length > 0 ? lockedCells : undefined
+      Object.keys(lockedCells).length > 0 ? lockedCells : undefined,
+      fieldPlayerCount
     );
     const newCells = buildCells(rotation, activePlayers, innings);
     for (const key of locked) {
@@ -613,6 +569,31 @@ function RotationView({
                 })}
               </View>
             ))}
+
+            {/* ── Missing positions footer ── */}
+            <View style={styles.gridRow}>
+              <View style={[styles.gridCell, styles.gridMissingLabel]}>
+                <Text style={styles.gridMissingLabelText}>Open</Text>
+              </View>
+              {inningNumbers.map((_, idx) => {
+                const missing = missingByInning[idx] ?? [];
+                const hasMissing = missing.length > 0;
+                return (
+                  <View
+                    key={idx}
+                    style={[styles.gridCell, styles.gridMissingCell, hasMissing && styles.gridMissingCellWarn]}
+                  >
+                    {hasMissing ? (
+                      <Text style={styles.gridMissingText} numberOfLines={3}>
+                        {missing.join('\n')}
+                      </Text>
+                    ) : (
+                      <Ionicons name="checkmark-circle" size={16} color="#1a5c2e" />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
           </View>
         </ScrollView>
       </ScrollView>
@@ -716,41 +697,8 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, fontWeight: '500', color: '#888' },
   tabTextActive: { color: '#1a1a1a', fontWeight: '600' },
 
-  list: { padding: 16, gap: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 40 },
   emptyText: { color: '#aaa', fontSize: 15, textAlign: 'center' },
-
-  // Batting order
-  orderRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 12,
-    paddingVertical: 10, paddingHorizontal: 14,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 }, elevation: 1,
-  },
-  orderRowAbsent: { backgroundColor: '#fafaf8', opacity: 0.6 },
-  orderNum: { width: 24, fontSize: 15, fontWeight: '700', color: '#1a5c2e' },
-  badge: {
-    width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#1a5c2e',
-    alignItems: 'center', justifyContent: 'center', marginRight: 10,
-  },
-  badgeAbsent: { backgroundColor: '#ccc' },
-  badgeNum: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  playerName: { flex: 1, fontSize: 15, fontWeight: '500', color: '#1a1a1a' },
-  dragHandle: { marginRight: 4 },
-  orderRowDragging: {
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  absentSection: {
-    fontSize: 11, fontWeight: '700', color: '#aaa',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-    paddingTop: 14, paddingBottom: 4, paddingHorizontal: 4,
-  },
 
   // Rotation
   rotationContainer: { flex: 1 },
@@ -811,6 +759,12 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 3, right: 3,
     width: 16, height: 16, alignItems: 'center', justifyContent: 'center', zIndex: 2,
   },
+  gridMissingLabel: { width: 90, backgroundColor: '#fafaf8', alignItems: 'flex-start', paddingLeft: 8 },
+  gridMissingLabelText: { fontSize: 10, fontWeight: '700', color: '#bbb', textTransform: 'uppercase', letterSpacing: 0.4 },
+  gridMissingCell: { width: 72, backgroundColor: '#fafaf8', paddingVertical: 4 },
+  gridMissingCellWarn: { backgroundColor: '#fff8f0' },
+  gridMissingText: { fontSize: 10, fontWeight: '700', color: '#e67e22', textAlign: 'center', lineHeight: 14 },
+
   hint: { textAlign: 'center', color: '#aaa', fontSize: 12, padding: 12 },
 
   // Scoresheet footer

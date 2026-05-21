@@ -184,7 +184,7 @@ export function subscribeToLeagues(ownerId: string, onUpdate: (leagues: League[]
 
 export async function addTeamGame(teamId: string, data: Omit<TeamGame, 'id'>): Promise<string> {
   const ref = await addDoc(collection(db, 'teams', teamId, 'games'), {
-    ...data,
+    ...stripUndefined(data as Record<string, any>),
     createdAt: serverTimestamp(),
   });
   return ref.id;

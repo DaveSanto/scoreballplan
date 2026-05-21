@@ -1,5 +1,23 @@
-export type Position = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'CF' | 'RF';
+export type Position = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'LCF' | 'CF' | 'RCF' | 'RF' | 'EH';
 export const ALL_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
+
+export const POSITIONS_BY_FIELD_COUNT: Record<number, Position[]> = {
+  9:  ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'],
+  10: ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'RCF', 'RF'],
+  11: ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'CF', 'RCF', 'RF'],
+  12: ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'LCF', 'CF', 'RCF', 'RF', 'EH'],
+};
+
+// ── Game rules ─────────────────────────────────────────────────────────────────
+export type GameRules = {
+  fieldPlayerCount: number;    // players on the field (default 9)
+  battingAllPlayers: boolean;  // true = whole active roster bats; false = starters only
+};
+
+export const DEFAULT_RULES: GameRules = {
+  fieldPlayerCount: 9,
+  battingAllPlayers: true,
+};
 
 // ── Scorecard types ────────────────────────────────────────────────────────────
 
@@ -33,7 +51,7 @@ export type Scorecard = {
   gameId?: string;
   date: string;        // ISO "2026-06-15"
   opponent: string;
-  isHome: boolean;
+  isHome: boolean | null;
   battingOrder: ScorecardBatter[];
   innings: ScorecardHalfInning[];  // 0-based index = inning - 1
   maxInnings: number;
@@ -101,6 +119,8 @@ export type Team = {
   homeField?: HomeField;
   // Users who hid this team from their dashboard (soft-delete for non-owners)
   hiddenFor?: string[];
+  // Game format rules (overrides league rules if set)
+  rules?: GameRules;
 };
 
 // ── League (top-level collection) ────────────────────────────────────────────
@@ -113,6 +133,7 @@ export type League = {
   teamIds: string[];
   scheduleConfig?: ScheduleConfig;
   schedule?: Schedule;
+  rules?: GameRules;
 };
 
 // ── Schedule types ────────────────────────────────────────────────────────────
@@ -167,15 +188,37 @@ export type Schedule = {
 };
 
 // ── Team schedule (team-level games, independent of league) ──────────────────
+export const GAME_TYPES = [
+  'Regular Season',
+  'Tournament',
+  'Exhibition',
+  'Playoff - Wild Card',
+  'Playoff - Divisional',
+  'Playoff - Conference',
+  'Playoff - Semifinal',
+  'Playoff - Championship',
+  'Practice',
+  'Scrimmage',
+  'Meeting',
+  'Rainout (Makeup)',
+  'Banquet',
+  'Team Party',
+  'Other',
+] as const;
+
+export type GameType = typeof GAME_TYPES[number];
+
 export type TeamGame = {
   id: string;
   date: string;        // ISO "2026-06-15" preferred; freeform accepted
   opponent: string;
   location?: string;
   time?: string;
-  isHome: boolean;
+  isHome: boolean | null;
+  gameType?: GameType;
   notes?: string;
-  absentPlayerIds?: string[];  // players who marked themselves unavailable for THIS game
+  absentPlayerIds?: string[];   // players who won't attend (set pre-game in Schedule tab)
+  benchedPlayerIds?: string[];  // players present but sitting out (set in-game in Game Plan)
 };
 
 // ── Team invite (co-admin access) ─────────────────────────────────────────────

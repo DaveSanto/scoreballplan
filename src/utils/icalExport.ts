@@ -20,9 +20,11 @@ export function generateIcal(games: TeamGame[], teamName: string): string {
   for (const game of games) {
     const dtstart = game.date.replace(/-/g, '');
     const uid = `${game.id || dtstart + game.opponent.replace(/\s/g, '')}@scoreball`;
-    const summary = game.isHome
+    const summary = game.isHome === true
       ? `${teamName} vs. ${game.opponent}`
-      : `${teamName} @ ${game.opponent}`;
+      : game.isHome === false
+      ? `${teamName} @ ${game.opponent}`
+      : `${teamName} vs. ${game.opponent} (TBD)`;
 
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${uid}`);

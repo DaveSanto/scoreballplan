@@ -28,7 +28,8 @@ import {
   updateLeague,
 } from '../../../src/firebase/db';
 import { generateSchedule } from '../../../src/utils/scheduler';
-import { GameSlot, LeagueInvite, Schedule, ScheduledGame, ScheduleConfig, Sport, Team, TeamScheduleStats } from '../../../src/types';
+import { GameSlot, LeagueInvite, Schedule, ScheduledGame, ScheduleConfig, Sport, Team, TeamScheduleStats, DEFAULT_RULES } from '../../../src/types';
+import { GameRulesModal } from '../../../src/components/GameRulesModal';
 
 type Tab = 'teams' | 'league-schedule' | 'invites';
 
@@ -219,10 +220,12 @@ function parseLeagueTeamsCsv(csv: string, existingNames: string[]): ParsedLeague
 export default function LeagueScreen() {
   const { id: leagueId } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
-  const { leagues, teams, hiddenTeams, getTeamPlayers, addTeamToLeague, removeTeamFromLeague, unhideTeam } = useApp();
+  const { leagues, teams, hiddenTeams, getTeamPlayers, addTeamToLeague, removeTeamFromLeague, unhideTeam, setLeagueRules } = useApp();
   const league = leagues.find((l) => l.id === leagueId);
+  const isLeagueOwner = league?.ownerId === user?.uid;
   const [activeTab, setActiveTab] = useState<Tab>('teams');
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
+  const [rulesModalOpen, setRulesModalOpen] = useState(false);
 
   useEffect(() => {
     if (!leagueId) return;
@@ -238,8 +241,22 @@ export default function LeagueScreen() {
   const availableTeams = teams.filter((t) => !league.teamIds.includes(t.id));
   const pendingCount = invites.filter((i) => i.status === 'pending').length;
 
+  const effectiveRules = league?.rules ?? DEFAULT_RULES;
+  const formatLabel = `${effectiveRules.fieldPlayerCount}-player field · ${effectiveRules.battingAllPlayers ? 'all bat' : 'starters bat'}`;
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* Format row */}
+      <Pressable
+        style={styles.formatRow}
+        onPress={() => isLeagueOwner && setRulesModalOpen(true)}
+        disabled={!isLeagueOwner}
+      >
+        <Ionicons name="options-outline" size={15} color="#1a5c2e" />
+        <Text style={styles.formatLabel}>Format: {formatLabel}</Text>
+        {isLeagueOwner && <Ionicons name="chevron-forward" size={14} color="#aaa" />}
+      </Pressable>
+
       <View style={styles.tabs}>
         {(['teams', 'league-schedule', 'invites'] as Tab[]).map((tab) => (
           <Pressable
@@ -341,6 +358,14 @@ export default function LeagueScreen() {
           invitedBy={user?.uid ?? ''}
         />
       )}
+
+      <GameRulesModal
+        visible={rulesModalOpen}
+        rules={effectiveRules}
+        title={`${league.name} — Game Format`}
+        onSave={(rules) => setLeagueRules(leagueId, rules)}
+        onClose={() => setRulesModalOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -1485,6 +1510,21 @@ function InviteFormModal({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f7f5' },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Format row
+  formatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 2,
+    backgroundColor: '#edf6f0',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  formatLabel: { flex: 1, fontSize: 13, color: '#1a5c2e', fontWeight: '500' },
 
   // Tab bar
   tabs: {

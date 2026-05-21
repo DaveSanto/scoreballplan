@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Team, League, Player, PositionRotation, Sport } from '../types';
+import { Team, League, Player, PositionRotation, Sport, GameRules, DEFAULT_RULES } from '../types';
 import { generateRotation } from '../utils/rotation';
 import {
   createTeam as dbCreateTeam,
@@ -63,6 +63,11 @@ type AppContextType = {
   setInnings: (teamId: string, n: number) => Promise<void>;
   getRotation: (teamId: string) => PositionRotation;
   regenerateRotation: (teamId: string) => void;
+
+  // Game rules
+  getEffectiveRules: (teamId: string) => GameRules;
+  setTeamRules: (teamId: string, rules: GameRules) => Promise<void>;
+  setLeagueRules: (leagueId: string, rules: GameRules) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -429,6 +434,36 @@ export function AppProvider({
     []
   );
 
+  // ── Game rules ────────────────────────────────────────────────────────────────
+
+  const getEffectiveRules = useCallback(
+    (teamId: string): GameRules => {
+      const team = teams.find((t) => t.id === teamId);
+      if (team?.rules) return team.rules;
+      if (team?.leagueId) {
+        const league = leagues.find((l) => l.id === team.leagueId);
+        if (league?.rules) return league.rules;
+      }
+      return DEFAULT_RULES;
+    },
+    [teams, leagues]
+  );
+
+  const setTeamRules = useCallback(
+    async (teamId: string, rules: GameRules) => {
+      rotationCache.delete(teamId);
+      await dbUpdateTeam(teamId, { rules });
+    },
+    []
+  );
+
+  const setLeagueRules = useCallback(
+    async (leagueId: string, rules: GameRules) => {
+      await dbUpdateLeague(leagueId, { rules });
+    },
+    []
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -459,6 +494,9 @@ export function AppProvider({
         setInnings,
         getRotation,
         regenerateRotation,
+        getEffectiveRules,
+        setTeamRules,
+        setLeagueRules,
       }}
     >
       {children}

@@ -1,4 +1,4 @@
-import { ALL_POSITIONS, InningAssignment, Player, Position, PositionRotation } from '../types';
+import { ALL_POSITIONS, InningAssignment, Player, Position, POSITIONS_BY_FIELD_COUNT, PositionRotation } from '../types';
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -49,9 +49,11 @@ function assignInning(
 export function generateRotation(
   players: Player[],
   innings: number,
-  lockedCells?: Record<string, Position | 'BENCH'>
+  lockedCells?: Record<string, Position | 'BENCH'>,
+  fieldPlayerCount = 9
 ): PositionRotation {
   if (players.length < 1) return {};
+  const fieldPositions = POSITIONS_BY_FIELD_COUNT[fieldPlayerCount] ?? ALL_POSITIONS;
 
   const rotation: PositionRotation = {};
   const benchCount: Record<string, number> = {};
@@ -82,8 +84,8 @@ export function generateRotation(
     }
 
     const unlockedPlayers = players.filter((p) => !lockedThisInning.has(p.id));
-    const fieldSlotsLeft = Math.max(0, 9 - lockedFieldPositions.size);
-    const availPositions = ALL_POSITIONS.filter((p) => !lockedFieldPositions.has(p));
+    const fieldSlotsLeft = Math.max(0, fieldPlayerCount - lockedFieldPositions.size);
+    const availPositions = fieldPositions.filter((p) => !lockedFieldPositions.has(p));
 
     let activePlayers: Player[];
 

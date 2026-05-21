@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../../../../src/store/AppContext';
 import { useAuth } from '../../../../src/store/AuthContext';
-import { Player, TeamGame } from '../../../../src/types';
+import { Player, TeamGame, GameType, GAME_TYPES } from '../../../../src/types';
 import { parseIcal } from '../../../../src/utils/icalImport';
 import { generateIcal } from '../../../../src/utils/icalExport';
 import {
@@ -89,6 +89,18 @@ function parseDateMs(dateStr: string): number {
   return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
+function parseTimeMs(timeStr?: string): number {
+  if (!timeStr) return Infinity; // no time sorts last
+  const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  if (!m) return Infinity;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const meridiem = m[3]?.toLowerCase();
+  if (meridiem === 'pm' && h !== 12) h += 12;
+  if (meridiem === 'am' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
 // ── CSV schedule parser ───────────────────────────────────────────────────────
 function splitCsvLine(line: string): string[] {
   const result: string[] = [];
@@ -103,6 +115,24 @@ function splitCsvLine(line: string): string[] {
   return result;
 }
 
+function normalizeDateToISO(raw: string): string | null {
+  const s = raw.trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // MM/DD/YYYY or M/D/YYYY
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
+  // MM-DD-YYYY or M-D-YYYY
+  const mdyDash = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (mdyDash) return `${mdyDash[3]}-${mdyDash[1].padStart(2, '0')}-${mdyDash[2].padStart(2, '0')}`;
+  // Try generic parse as a last resort
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+
 function parseScheduleCsv(text: string): {
   games: Omit<TeamGame, 'id'>[];
   errors: string[];
@@ -115,23 +145,33 @@ function parseScheduleCsv(text: string): {
   }
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCsvLine(lines[i]);
-    const date = cols[0]?.trim();
+    const rawDate = cols[0]?.trim();
     const opponent = cols[1]?.trim();
     const location = cols[2]?.trim() || undefined;
     const time = cols[3]?.trim() || undefined;
     const homeAway = cols[4]?.trim().toLowerCase() ?? '';
-    if (!date || !opponent) {
+    if (!rawDate || !opponent) {
       errors.push(`Row ${i + 1}: missing date or opponent — skipped.`);
       continue;
     }
-    games.push({ date, opponent, location, time, isHome: homeAway.startsWith('h') || homeAway === '' });
+    const date = normalizeDateToISO(rawDate);
+    if (!date) {
+      errors.push(`Row ${i + 1}: unrecognized date "${rawDate}" — skipped. Use YYYY-MM-DD or MM/DD/YYYY.`);
+      continue;
+    }
+    const isHome = homeAway === '' ? null : homeAway.startsWith('h') ? true : homeAway.startsWith('a') ? false : null;
+    const rawType = cols[5]?.trim() ?? '';
+    const gameType: GameType = (GAME_TYPES as readonly string[]).includes(rawType)
+      ? rawType as GameType
+      : 'Regular Season';
+    games.push({ date, opponent, location, time, isHome, gameType });
   }
   return { games, errors };
 }
 
-const CSV_TEMPLATE = `Date,Opponent,Location,Time,Home/Away
-2026-06-15,Tigers,Central Park,6:30 PM,Home
-2026-06-22,Bears,North Field,8:00 PM,Away
+const CSV_TEMPLATE = `Date,Opponent,Location,Time,Home/Away,Type
+2026-06-15,Tigers,Central Park,6:30 PM,Home,Regular Season
+2026-06-22,Bears,North Field,8:00 PM,Away,Regular Season
 `;
 
 // ── Main screen ───────────────────────────────────────────────────────────────
@@ -149,6 +189,7 @@ export default function ScheduleScreen() {
   const [editingGame, setEditingGame] = useState<TeamGame | null>(null);
   const [csvPreview, setCsvPreview] = useState<ReturnType<typeof parseScheduleCsv> | null>(null);
   const [csvModal, setCsvModal] = useState(false);
+  const [clearSeasonConfirm, setClearSeasonConfirm] = useState(false);
   const fileInputRef = useRef<any>(null);
 
   useEffect(() => {
@@ -156,7 +197,10 @@ export default function ScheduleScreen() {
     // subscribeToTeamGames calls onUpdate([]) on error, so games transitions
     // from null → [] on any response (success or failure), clearing the spinner
     return subscribeToTeamGames(teamId, (g) => {
-      setGames(g.sort((a, b) => parseDateMs(a.date) - parseDateMs(b.date)));
+      setGames(g.sort((a, b) => {
+        const dateDiff = parseDateMs(a.date) - parseDateMs(b.date);
+        return dateDiff !== 0 ? dateDiff : parseTimeMs(a.time) - parseTimeMs(b.time);
+      }));
     });
   }, [teamId]);
 
@@ -188,7 +232,7 @@ export default function ScheduleScreen() {
   }
 
   function openAdd() { setEditingGame(null); setGameModal(true); }
-  function openEdit(game: TeamGame) { setEditingGame(game); setGameModal(true); }
+  function openEdit(game: TeamGame) { if (!isAdmin) return; setEditingGame(game); setGameModal(true); }
 
   async function handleSaveGame(data: Omit<TeamGame, 'id'>) {
     if (editingGame) {
@@ -199,11 +243,25 @@ export default function ScheduleScreen() {
     setGameModal(false);
   }
 
-  function handleDeleteGame(gameId: string) {
-    Alert.alert('Remove Game', 'Remove this game from the schedule?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => dbDeleteTeamGame(teamId, gameId) },
-    ]);
+  async function handleDeleteGame(gameId: string) {
+    setGameModal(false);
+    try {
+      await dbDeleteTeamGame(teamId, gameId);
+    } catch (e) {
+      console.error('deleteTeamGame failed', e);
+      Alert.alert('Error', 'Could not remove game. Please try again.');
+    }
+  }
+
+  async function handleClearSeasonConfirmed() {
+    if (!games) return;
+    const future = games.filter((g) => g.date >= new Date().toISOString().slice(0, 10));
+    setClearSeasonConfirm(false);
+    try {
+      await Promise.all(future.map((g) => dbDeleteTeamGame(teamId, g.id)));
+    } catch (e) {
+      console.error('clearSeason failed', e);
+    }
   }
 
   function handleImportUpload() {
@@ -350,9 +408,9 @@ export default function ScheduleScreen() {
                         <Text style={styles.gameHeaderOpponent} numberOfLines={2}>
                           {game.opponent}
                         </Text>
-                        <View style={[styles.haChip, game.isHome ? styles.homeChip : styles.awayChip]}>
-                          <Text style={[styles.haText, game.isHome ? styles.homeText : styles.awayText]}>
-                            {game.isHome ? 'Home' : 'Away'}
+                        <View style={[styles.haChip, game.isHome === true ? styles.homeChip : game.isHome === false ? styles.awayChip : styles.tbdChip]}>
+                          <Text style={[styles.haText, game.isHome === true ? styles.homeText : game.isHome === false ? styles.awayText : styles.tbdText]}>
+                            {game.isHome === true ? 'Home' : game.isHome === false ? 'Away' : 'TBD'}
                           </Text>
                         </View>
                       </Pressable>
@@ -428,6 +486,22 @@ export default function ScheduleScreen() {
             <Pressable onPress={handleExportIcal}>
               <Text style={styles.templateLink}>Export .ical</Text>
             </Pressable>
+            {isAdmin && games && games.length > 0 && !clearSeasonConfirm && (
+              <Pressable onPress={() => setClearSeasonConfirm(true)}>
+                <Text style={[styles.templateLink, { color: '#c0392b' }]}>Clear season</Text>
+              </Pressable>
+            )}
+            {isAdmin && clearSeasonConfirm && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.templateLink, { color: '#c0392b' }]}>Delete all upcoming games?</Text>
+                <Pressable onPress={handleClearSeasonConfirmed}>
+                  <Text style={[styles.templateLink, { color: '#c0392b', fontWeight: '700' }]}>Yes</Text>
+                </Pressable>
+                <Pressable onPress={() => setClearSeasonConfirm(false)}>
+                  <Text style={styles.templateLink}>No</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
           <Pressable style={styles.addBtn} onPress={openAdd}>
             <Ionicons name="add" size={20} color="#fff" />
@@ -443,7 +517,7 @@ export default function ScheduleScreen() {
         onSave={handleSaveGame}
         onDelete={
           editingGame
-            ? () => { setGameModal(false); handleDeleteGame(editingGame.id); }
+            ? () => handleDeleteGame(editingGame.id)
             : undefined
         }
       />
@@ -496,9 +570,11 @@ function GameModal({
   const [opponent, setOpponent] = useState('');
   const [location, setLocation] = useState('');
   const [time, setTime] = useState('');
-  const [isHome, setIsHome] = useState(true);
+  const [isHome, setIsHome] = useState<boolean | null>(null);
+  const [gameType, setGameType] = useState<GameType>('Regular Season');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   React.useEffect(() => {
     if (visible) {
@@ -506,8 +582,10 @@ function GameModal({
       setOpponent(game?.opponent ?? '');
       setLocation(game?.location ?? '');
       setTime(game?.time ?? '');
-      setIsHome(game?.isHome ?? true);
+      setIsHome(game?.isHome ?? null);
+      setGameType(game?.gameType ?? 'Regular Season');
       setNotes(game?.notes ?? '');
+      setConfirmingDelete(false);
     }
   }, [visible, game]);
 
@@ -527,6 +605,7 @@ function GameModal({
         location: location.trim() || undefined,
         time: time.trim() || undefined,
         isHome,
+        gameType,
         notes: notes.trim() || undefined,
       });
     } finally {
@@ -596,16 +675,22 @@ function GameModal({
             <Text style={styles.fieldLabel}>Home / Away</Text>
             <View style={styles.chipRow}>
               <Pressable
-                style={[styles.toggleChip, isHome && styles.toggleChipActive]}
+                style={[styles.toggleChip, isHome === true && styles.toggleChipActive]}
                 onPress={() => setIsHome(true)}
               >
-                <Text style={[styles.toggleChipText, isHome && styles.toggleChipTextActive]}>Home</Text>
+                <Text style={[styles.toggleChipText, isHome === true && styles.toggleChipTextActive]}>Home</Text>
               </Pressable>
               <Pressable
-                style={[styles.toggleChip, !isHome && styles.toggleChipActive]}
+                style={[styles.toggleChip, isHome === false && styles.toggleChipActive]}
                 onPress={() => setIsHome(false)}
               >
-                <Text style={[styles.toggleChipText, !isHome && styles.toggleChipTextActive]}>Away</Text>
+                <Text style={[styles.toggleChipText, isHome === false && styles.toggleChipTextActive]}>Away</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.toggleChip, isHome === null && styles.toggleChipActive]}
+                onPress={() => setIsHome(null)}
+              >
+                <Text style={[styles.toggleChipText, isHome === null && styles.toggleChipTextActive]}>TBD</Text>
               </Pressable>
             </View>
 
@@ -625,6 +710,19 @@ function GameModal({
               placeholder="Field or venue name"
             />
 
+            <Text style={styles.fieldLabel}>Game Type</Text>
+            <View style={styles.typeGrid}>
+              {GAME_TYPES.map((t) => (
+                <Pressable
+                  key={t}
+                  style={[styles.typeChip, gameType === t && styles.typeChipActive]}
+                  onPress={() => setGameType(t)}
+                >
+                  <Text style={[styles.typeChipText, gameType === t && styles.typeChipTextActive]}>{t}</Text>
+                </Pressable>
+              ))}
+            </View>
+
             <Text style={styles.fieldLabel}>Notes</Text>
             <TextInput
               style={[styles.input, { height: 70, textAlignVertical: 'top', paddingTop: 11 }]}
@@ -634,11 +732,24 @@ function GameModal({
               multiline
             />
 
-            {onDelete && (
-              <Pressable style={styles.deleteGameBtn} onPress={onDelete}>
+            {onDelete && !confirmingDelete && (
+              <Pressable style={styles.deleteGameBtn} onPress={() => setConfirmingDelete(true)}>
                 <Ionicons name="trash-outline" size={16} color="#c0392b" />
                 <Text style={styles.deleteGameBtnText}>Remove Game</Text>
               </Pressable>
+            )}
+            {onDelete && confirmingDelete && (
+              <View style={styles.deleteConfirm}>
+                <Text style={styles.deleteConfirmText}>Remove this game?</Text>
+                <View style={styles.deleteConfirmBtns}>
+                  <Pressable style={styles.deleteConfirmCancel} onPress={() => setConfirmingDelete(false)}>
+                    <Text style={styles.deleteConfirmCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable style={styles.deleteConfirmOk} onPress={onDelete}>
+                    <Text style={styles.deleteConfirmOkText}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
             )}
 
             <View style={{ height: 16 }} />
@@ -733,7 +844,7 @@ function CsvScheduleModal({
                   <View style={{ flex: 1 }}>
                     <Text style={styles.csvGameOpponent}>{g.opponent}</Text>
                     <Text style={styles.csvGameMeta}>
-                      {g.isHome ? 'Home' : 'Away'}
+                      {g.isHome === true ? 'Home' : g.isHome === false ? 'Away' : 'TBD'}
                       {g.location ? ` · ${g.location}` : ''}
                       {g.time ? ` · ${g.time}` : ''}
                     </Text>
@@ -866,9 +977,11 @@ const styles = StyleSheet.create({
   haChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   homeChip: { backgroundColor: '#edf6f0' },
   awayChip: { backgroundColor: '#fef9f0' },
+  tbdChip: { backgroundColor: '#f0f0ef' },
   haText: { fontSize: 9, fontWeight: '700' },
   homeText: { color: '#1a5c2e' },
   awayText: { color: '#e67e22' },
+  tbdText: { color: '#999' },
 
   // Data cells
   dataCell: {
@@ -945,12 +1058,36 @@ const styles = StyleSheet.create({
   toggleChipActive: { borderColor: '#1a5c2e', backgroundColor: '#edf6f0' },
   toggleChipText: { fontSize: 14, fontWeight: '500', color: '#888' },
   toggleChipTextActive: { color: '#1a5c2e', fontWeight: '700' },
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
+  typeChip: {
+    paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8,
+    borderWidth: 1.5, borderColor: '#ddd', backgroundColor: '#fafaf8',
+  },
+  typeChipActive: { borderColor: '#1a5c2e', backgroundColor: '#edf6f0' },
+  typeChipText: { fontSize: 13, fontWeight: '500', color: '#888' },
+  typeChipTextActive: { color: '#1a5c2e', fontWeight: '700' },
   deleteGameBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center',
     paddingVertical: 10, paddingHorizontal: 20, marginTop: 14,
     borderRadius: 10, borderWidth: 1.5, borderColor: '#c0392b',
   },
   deleteGameBtnText: { color: '#c0392b', fontWeight: '600', fontSize: 14 },
+  deleteConfirm: {
+    marginTop: 14, padding: 14, borderRadius: 10,
+    backgroundColor: '#fff5f5', borderWidth: 1.5, borderColor: '#c0392b',
+  },
+  deleteConfirmText: { color: '#c0392b', fontWeight: '600', fontSize: 14, textAlign: 'center', marginBottom: 10 },
+  deleteConfirmBtns: { flexDirection: 'row', gap: 8 },
+  deleteConfirmCancel: {
+    flex: 1, paddingVertical: 9, borderRadius: 8,
+    backgroundColor: '#f0f0ef', alignItems: 'center',
+  },
+  deleteConfirmCancelText: { color: '#555', fontWeight: '600', fontSize: 14 },
+  deleteConfirmOk: {
+    flex: 1, paddingVertical: 9, borderRadius: 8,
+    backgroundColor: '#c0392b', alignItems: 'center',
+  },
+  deleteConfirmOkText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
   modalBtn: {
     flex: 1, borderRadius: 10, paddingVertical: 14,
