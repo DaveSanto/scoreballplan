@@ -6,7 +6,6 @@ import {
   onAuthStateChanged,
   updateProfile,
   GoogleAuthProvider,
-  OAuthProvider,
   signInWithCredential,
   signInWithPopup,
 } from 'firebase/auth';
@@ -16,7 +15,6 @@ import {
   CryptoEncoding,
   getRandomBytesAsync,
 } from 'expo-crypto';
-import * as AppleAuthentication from 'expo-apple-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import { auth } from '../firebase/config';
 import { subscribeToUserProfile, updateUserProfile as dbUpdateUserProfile } from '../firebase/db';
@@ -29,7 +27,6 @@ type AuthContextValue = {
   userProfile: UserProfile;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   updateDisplayName: (firstName: string, lastName: string) => Promise<void>;
   updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
@@ -111,36 +108,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithCredential(auth, credential);
   }
 
-  async function signInWithApple() {
-    if (Platform.OS === 'web') {
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('name');
-      provider.addScope('email');
-      await signInWithPopup(auth, provider);
-      return;
-    }
-
-    const rawNonce =
-      Math.random().toString(36).substring(2, 18) +
-      Math.random().toString(36).substring(2, 18);
-    const hashedNonce = await digestStringAsync(CryptoDigestAlgorithm.SHA256, rawNonce);
-
-    const appleCredential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-      nonce: hashedNonce,
-    });
-
-    const { identityToken } = appleCredential;
-    if (!identityToken) throw new Error('Apple sign-in failed: no identity token');
-
-    const provider = new OAuthProvider('apple.com');
-    const credential = provider.credential({ idToken: identityToken, rawNonce });
-    await signInWithCredential(auth, credential);
-  }
-
   async function signOut() {
     await firebaseSignOut(auth);
   }
@@ -160,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signInWithApple, signOut, updateDisplayName, updateUserProfile }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signOut, updateDisplayName, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

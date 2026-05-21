@@ -16,7 +16,7 @@ import { TeamInvite } from '../../../src/types';
 
 export default function TeamInviteScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
-  const { user, signInWithGoogle, signInWithApple } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
   const [invite, setInvite] = useState<TeamInvite | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -120,10 +120,6 @@ export default function TeamInviteScreen() {
               <Ionicons name="logo-google" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>Sign in with Google</Text>
             </Pressable>
-            <Pressable style={styles.appleBtn} onPress={signInWithApple}>
-              <Ionicons name="logo-apple" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>Sign in with Apple</Text>
-            </Pressable>
           </View>
         )}
 
@@ -193,17 +189,6 @@ const styles = StyleSheet.create({
 
   primaryBtn: {
     backgroundColor: '#1a5c2e',
-    borderRadius: 14,
-    paddingVertical: 15,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    width: '100%',
-  },
-  appleBtn: {
-    backgroundColor: '#000',
     borderRadius: 14,
     paddingVertical: 15,
     paddingHorizontal: 24,
