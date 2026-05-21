@@ -27,6 +27,29 @@ import {
   deleteTeamGame as dbDeleteTeamGame,
 } from '../../../../src/firebase/db';
 
+// ── Game type colors ──────────────────────────────────────────────────────────
+const GAME_TYPE_COLORS: Record<string, { bg: string; text: string }> = {
+  'Regular Season':          { bg: '#edf6f0', text: '#1a5c2e' },
+  'Tournament':              { bg: '#f0eeff', text: '#5b3fd4' },
+  'Exhibition':              { bg: '#e8f4fb', text: '#1a6fa0' },
+  'Playoff - Wild Card':     { bg: '#fff3e0', text: '#c47000' },
+  'Playoff - Divisional':    { bg: '#ffe8cc', text: '#b85c00' },
+  'Playoff - Conference':    { bg: '#ffddb8', text: '#a34a00' },
+  'Playoff - Semifinal':     { bg: '#ffd0a0', text: '#8f3800' },
+  'Playoff - Championship':  { bg: '#fff0b3', text: '#7a5800' },
+  'Practice':                { bg: '#f0f0ef', text: '#555' },
+  'Scrimmage':               { bg: '#e8f0fe', text: '#3050a8' },
+  'Meeting':                 { bg: '#f5f0ff', text: '#6b4fa8' },
+  'Rainout (Makeup)':        { bg: '#e8f5f9', text: '#2a7090' },
+  'Banquet':                 { bg: '#fce8f3', text: '#a0306a' },
+  'Team Party':              { bg: '#ffe8f5', text: '#b03070' },
+  'Other':                   { bg: '#f5f5f4', text: '#777' },
+};
+
+function gameTypeColor(type?: string) {
+  return GAME_TYPE_COLORS[type ?? 'Regular Season'] ?? GAME_TYPE_COLORS['Regular Season'];
+}
+
 // ── Grid layout constants ─────────────────────────────────────────────────────
 const PLAYER_COL_W = 148;
 const GAME_COL_W = 90;
@@ -428,8 +451,8 @@ export default function ScheduleScreen() {
                             </Text>
                           </View>
                           {(game.gameType ?? 'Regular Season') !== 'Regular Season' && (
-                            <View style={[styles.haChip, styles.typeHeaderChip]}>
-                              <Text style={[styles.haText, styles.typeHeaderText]} numberOfLines={1}>
+                            <View style={[styles.haChip, { backgroundColor: gameTypeColor(game.gameType).bg }]}>
+                              <Text style={[styles.haText, { color: gameTypeColor(game.gameType).text }]} numberOfLines={1}>
                                 {game.gameType}
                               </Text>
                             </View>
@@ -734,15 +757,19 @@ function GameModal({
 
             <Text style={styles.fieldLabel}>Game Type</Text>
             <View style={styles.typeGrid}>
-              {GAME_TYPES.map((t) => (
-                <Pressable
-                  key={t}
-                  style={[styles.typeChip, gameType === t && styles.typeChipActive]}
-                  onPress={() => setGameType(t)}
-                >
-                  <Text style={[styles.typeChipText, gameType === t && styles.typeChipTextActive]}>{t}</Text>
-                </Pressable>
-              ))}
+              {GAME_TYPES.map((t) => {
+                const active = gameType === t;
+                const color = gameTypeColor(t);
+                return (
+                  <Pressable
+                    key={t}
+                    style={[styles.typeChip, active && { borderColor: color.text, backgroundColor: color.bg }]}
+                    onPress={() => setGameType(t)}
+                  >
+                    <Text style={[styles.typeChipText, active && { color: color.text, fontWeight: '700' }]}>{t}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
             <Text style={styles.fieldLabel}>Notes</Text>
