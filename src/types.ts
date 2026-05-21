@@ -78,6 +78,7 @@ export type Player = {
   battingAverage?: number | null;
   obp?: number | null;
   era?: number | null;
+  phone?: string;
   addedBy: string;        // uid of user who created this record
   claimedBy?: string;     // uid of player themselves (once they sign up)
   guardianId?: string;    // uid of parent/guardian managing this player
@@ -104,8 +105,9 @@ export type Team = {
   absentPlayerIds: string[];   // sitting out the next game
   innings: number;
   rosterVisibility: Visibility; // captain controls whether league can see roster
-  coAdminIds?: string[];        // account holders granted team-editor access by the owner
-  viewerIds?: string[];         // account holders with read-only access
+  coAdminIds?: string[];        // co-captains: full management access
+  memberIds?: string[];         // team members: read + own availability toggle
+  viewerIds?: string[];         // pure viewers: read-only (parents, friends, etc.)
   // Contact info (stored from CSV import; invites are separate)
   captain1Name?: string;
   captain1Phone?: string;
@@ -221,9 +223,14 @@ export type TeamGame = {
   benchedPlayerIds?: string[];  // players present but sitting out (set in-game in Game Plan)
 };
 
+// ── User profile (extra info beyond Firebase Auth) ────────────────────────────
+export type UserProfile = {
+  phone?: string;
+};
+
 // ── Team invite (co-admin access) ─────────────────────────────────────────────
 export type InviteStatus = 'pending' | 'accepted' | 'declined';
-export type TeamRole = 'owner' | 'editor' | 'viewer';
+export type TeamRole = 'owner' | 'editor' | 'member' | 'viewer';
 
 export type TeamInvite = {
   id: string;

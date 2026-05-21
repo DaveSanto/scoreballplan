@@ -458,6 +458,7 @@ function PlayerModal({
   const [name, setName] = useState('');
   const [number, setNumber] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [bats, setBats] = useState<Handedness | undefined>(undefined);
   const [throws_, setThrows] = useState<'L' | 'R' | undefined>(undefined);
   const [prefs, setPrefs] = useState<(Position | undefined)[]>([undefined, undefined, undefined, undefined]);
@@ -472,6 +473,7 @@ function PlayerModal({
       setName(player?.name ?? '');
       setNumber(player?.number ?? '');
       setEmail(player?.email ?? '');
+      setPhone(player?.phone ?? '');
       setBats(player?.bats);
       setThrows(player?.throws);
       const p = player?.preferredPositions ?? [];
@@ -501,6 +503,7 @@ function PlayerModal({
         name: name.trim(),
         number: number.trim(),
         email: email.trim() || undefined,
+        phone: phone.trim() || undefined,
         bats,
         throws: throws_,
         preferredPositions: preferredPositions.length > 0 ? preferredPositions : undefined,
@@ -544,6 +547,15 @@ function PlayerModal({
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+            />
+
+            <Text style={styles.fieldLabel}>Phone</Text>
+            <TextInput
+              style={styles.input}
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="(555) 555-5555"
+              keyboardType="phone-pad"
             />
 
             {/* Bats */}

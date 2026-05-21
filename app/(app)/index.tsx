@@ -25,15 +25,38 @@ type DeleteTarget = { kind: 'team'; item: Team } | { kind: 'league'; item: Leagu
 
 export default function DashboardScreen() {
   const { bottom: bottomInset } = useSafeAreaInsets();
-  const { user, signOut, updateDisplayName } = useAuth();
+  const { user, userProfile, signOut, updateDisplayName, updateUserProfile } = useAuth();
   const { teams, leagues, loading, createTeam, removeTeam, hideTeam, createLeague, removeLeague } = useApp();
   const [createMode, setCreateMode] = useState<CreateMode>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
-  const [editingName, setEditingName] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [savingName, setSavingName] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function openEdit() {
+    const parts = (user?.displayName ?? '').split(' ');
+    setFirstName(parts[0] ?? '');
+    setLastName(parts.slice(1).join(' ') ?? '');
+    setPhone(userProfile.phone ?? '');
+    setEditing(true);
+  }
+
+  async function saveProfile() {
+    if (!firstName.trim() || saving) return;
+    setSaving(true);
+    try {
+      await Promise.all([
+        updateDisplayName(firstName, lastName),
+        updateUserProfile({ phone: phone.trim() || undefined }),
+      ]);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const displayName = user?.displayName?.split(' ')[0] ?? 'Coach';
   const initial = (user?.displayName ?? user?.email ?? 'C')[0].toUpperCase();
@@ -63,9 +86,9 @@ export default function DashboardScreen() {
         visible={profileOpen}
         animationType="slide"
         transparent
-        onRequestClose={() => { setProfileOpen(false); setEditingName(false); }}
+        onRequestClose={() => { setProfileOpen(false); setEditing(false); }}
       >
-        <Pressable style={styles.profileOverlay} onPress={() => { setProfileOpen(false); setEditingName(false); }}>
+        <Pressable style={styles.profileOverlay} onPress={() => { setProfileOpen(false); setEditing(false); }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <Pressable style={styles.profileSheet} onPress={() => {}}>
               <View style={styles.profileHandle} />
@@ -73,7 +96,7 @@ export default function DashboardScreen() {
                 <Text style={styles.profileAvatarText}>{initial}</Text>
               </View>
 
-              {editingName ? (
+              {editing ? (
                 <>
                   <View style={styles.nameEditRow}>
                     <TextInput
@@ -89,53 +112,53 @@ export default function DashboardScreen() {
                       value={lastName}
                       onChangeText={setLastName}
                       placeholder="Last name"
+                      returnKeyType="next"
+                    />
+                    <TextInput
+                      style={styles.nameInput}
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder="Phone number"
+                      keyboardType="phone-pad"
                       returnKeyType="done"
-                      onSubmitEditing={async () => {
-                        if (!firstName.trim() || savingName) return;
-                        setSavingName(true);
-                        try { await updateDisplayName(firstName, lastName); setEditingName(false); }
-                        finally { setSavingName(false); }
-                      }}
+                      onSubmitEditing={saveProfile}
                     />
                   </View>
                   <View style={styles.nameEditActions}>
-                    <Pressable style={styles.nameCancelBtn} onPress={() => setEditingName(false)} disabled={savingName}>
+                    <Pressable style={styles.nameCancelBtn} onPress={() => setEditing(false)} disabled={saving}>
                       <Text style={styles.nameCancelText}>Cancel</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.nameSaveBtn, (!firstName.trim() || savingName) && styles.disabled]}
-                      disabled={!firstName.trim() || savingName}
-                      onPress={async () => {
-                        setSavingName(true);
-                        try { await updateDisplayName(firstName, lastName); setEditingName(false); }
-                        finally { setSavingName(false); }
-                      }}
+                      style={[styles.nameSaveBtn, (!firstName.trim() || saving) && styles.disabled]}
+                      disabled={!firstName.trim() || saving}
+                      onPress={saveProfile}
                     >
-                      {savingName
+                      {saving
                         ? <ActivityIndicator color="#fff" size="small" />
                         : <Text style={styles.nameSaveText}>Save</Text>}
                     </Pressable>
                   </View>
                 </>
               ) : (
-                <Pressable
-                  style={styles.profileNameRow}
-                  onPress={() => {
-                    const parts = (user?.displayName ?? '').split(' ');
-                    setFirstName(parts[0] ?? '');
-                    setLastName(parts.slice(1).join(' ') ?? '');
-                    setEditingName(true);
-                  }}
-                >
-                  <Text style={styles.profileName}>{user?.displayName ?? 'Set your name'}</Text>
-                  <Ionicons name="pencil-outline" size={15} color="#aaa" />
-                </Pressable>
+                <>
+                  <Pressable style={styles.profileNameRow} onPress={openEdit}>
+                    <Text style={styles.profileName}>{user?.displayName ?? 'Set your name'}</Text>
+                    <Ionicons name="pencil-outline" size={15} color="#aaa" />
+                  </Pressable>
+                  <Text style={styles.profileEmail}>{user?.email}</Text>
+                  <Pressable style={styles.profilePhoneRow} onPress={openEdit}>
+                    <Ionicons name="call-outline" size={14} color="#aaa" />
+                    <Text style={[styles.profileEmail, { marginBottom: 0 }]}>
+                      {userProfile.phone || 'Add phone number'}
+                    </Text>
+                    <Ionicons name="pencil-outline" size={13} color="#ccc" />
+                  </Pressable>
+                </>
               )}
 
-              <Text style={styles.profileEmail}>{user?.email}</Text>
               <Pressable
                 style={styles.signOutBtn}
-                onPress={() => { setProfileOpen(false); setEditingName(false); signOut(); }}
+                onPress={() => { setProfileOpen(false); setEditing(false); signOut(); }}
               >
                 <Ionicons name="log-out-outline" size={18} color="#c0392b" />
                 <Text style={styles.signOutBtnText}>Sign Out</Text>

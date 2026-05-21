@@ -19,22 +19,27 @@ import {
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as WebBrowser from 'expo-web-browser';
 import { auth } from '../firebase/config';
+import { subscribeToUserProfile, updateUserProfile as dbUpdateUserProfile } from '../firebase/db';
+import { UserProfile } from '../types';
 
 WebBrowser.maybeCompleteAuthSession();
 
 type AuthContextValue = {
   user: User | null;
+  userProfile: UserProfile;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signOut: () => Promise<void>;
   updateDisplayName: (firstName: string, lastName: string) => Promise<void>;
+  updateUserProfile: (data: Partial<UserProfile>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,6 +49,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) { setUserProfile({}); return; }
+    return subscribeToUserProfile(user.uid, setUserProfile);
+  }, [user?.uid]);
 
   async function signInWithGoogle() {
     if (Platform.OS === 'web') {
@@ -135,6 +145,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await firebaseSignOut(auth);
   }
 
+  async function updateUserProfile(data: Partial<UserProfile>) {
+    if (!auth.currentUser) return;
+    await dbUpdateUserProfile(auth.currentUser.uid, data);
+  }
+
   async function updateDisplayName(firstName: string, lastName: string) {
     if (!auth.currentUser) return;
     const displayName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ');
@@ -145,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithApple, signOut, updateDisplayName }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signInWithApple, signOut, updateDisplayName, updateUserProfile }}>
       {children}
     </AuthContext.Provider>
   );

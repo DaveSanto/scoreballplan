@@ -53,6 +53,7 @@ function gameTypeColor(type?: string) {
 // ── Grid layout constants ─────────────────────────────────────────────────────
 const PLAYER_COL_W = 148;
 const GAME_COL_W = 90;
+const DATE_ROW_H = 28;
 const HEADER_H = 96;
 const ROW_H = 48;
 
@@ -252,11 +253,13 @@ export default function ScheduleScreen() {
   const sortedPlayers = sortPlayerList(teamPlayers, sortBy);
 
   // Authorization
-  const isAdmin = user?.uid === team.ownerId || (team.coAdminIds ?? []).includes(user?.uid ?? '');
+  const uid = user?.uid ?? '';
+  const isAdmin = uid === team.ownerId || (team.coAdminIds ?? []).includes(uid);
+  const isMember = isAdmin || (team.memberIds ?? []).includes(uid);
   // Player this user has claimed as themselves, or any players they're guarding
-  const myClaimedPlayer = teamPlayers.find((p) => p.claimedBy === user?.uid);
+  const myClaimedPlayer = teamPlayers.find((p) => p.claimedBy === uid);
   const myGuardedPlayerIds = new Set(
-    teamPlayers.filter((p) => p.guardianId === user?.uid).map((p) => p.id)
+    teamPlayers.filter((p) => p.guardianId === uid).map((p) => p.id)
   );
 
   async function toggleAvailability(game: TeamGame, playerId: string) {
@@ -408,7 +411,7 @@ export default function ScheduleScreen() {
             <View style={styles.gridRow}>
               {/* Fixed left: player names */}
               <View style={{ width: PLAYER_COL_W }}>
-                <View style={[styles.cornerCell, { height: HEADER_H }]}>
+                <View style={[styles.cornerCell, { height: DATE_ROW_H + HEADER_H }]}>
                   <Text style={styles.cornerLabel}>Player</Text>
                 </View>
                 {sortedPlayers.map((player, i) => (
@@ -432,18 +435,34 @@ export default function ScheduleScreen() {
                 nestedScrollEnabled
               >
                 <View>
-                  {/* Game header row */}
+                  {/* Date row */}
+                  <View style={{ flexDirection: 'row' }}>
+                    {games.map((game) => (
+                      <View key={game.id} style={[styles.dateRow, { width: GAME_COL_W, height: DATE_ROW_H }]}>
+                        <Text style={styles.dateRowText}>{formatDateShort(game.date)}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Game info row */}
                   <View style={{ flexDirection: 'row' }}>
                     {games.map((game) => (
                       <Pressable
                         key={game.id}
-                        style={[styles.gameHeaderCell, { width: GAME_COL_W, height: HEADER_H }]}
+                        style={[
+                          styles.gameHeaderCell,
+                          { width: GAME_COL_W, height: HEADER_H },
+                          (game.gameType && game.gameType !== 'Regular Season')
+                            && { backgroundColor: gameTypeColor(game.gameType).bg },
+                        ]}
                         onPress={() => openEdit(game)}
                       >
-                        <Text style={styles.gameHeaderDate}>{formatDateShort(game.date)}</Text>
                         <Text style={styles.gameHeaderOpponent} numberOfLines={2}>
                           {game.opponent}
                         </Text>
+                        {game.time && (
+                          <Text style={styles.gameHeaderTime}>{game.time}</Text>
+                        )}
                         <View style={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap' }}>
                           <View style={[styles.haChip, game.isHome === true ? styles.homeChip : game.isHome === false ? styles.awayChip : styles.tbdChip]}>
                             <Text style={[styles.haText, game.isHome === true ? styles.homeText : game.isHome === false ? styles.awayText : styles.tbdText]}>
@@ -452,7 +471,7 @@ export default function ScheduleScreen() {
                           </View>
                           {(game.gameType ?? 'Regular Season') !== 'Regular Season' && (
                             <View style={[styles.haChip, { backgroundColor: gameTypeColor(game.gameType).bg }]}>
-                              <Text style={[styles.haText, { color: gameTypeColor(game.gameType).text }]} numberOfLines={1}>
+                              <Text style={[styles.haText, { color: gameTypeColor(game.gameType).text, flexShrink: 1 }]}>
                                 {game.gameType}
                               </Text>
                             </View>
@@ -465,7 +484,7 @@ export default function ScheduleScreen() {
                   {/* Player data rows */}
                   {sortedPlayers.map((player, i) => {
                     const isMyRow = player.id === myClaimedPlayer?.id || myGuardedPlayerIds.has(player.id);
-                    const canToggle = isAdmin || isMyRow;
+                    const canToggle = isAdmin || (isMember && isMyRow);
                     return (
                       <View
                         key={player.id}
@@ -512,7 +531,7 @@ export default function ScheduleScreen() {
             <Text style={styles.legendText}>Unavailable</Text>
           </View>
           <Text style={styles.legendHint}>
-            {isAdmin ? 'Tap any cell to toggle' : (myClaimedPlayer || myGuardedPlayerIds.size > 0) ? 'Tap your row to update availability' : 'Link your profile on the Roster tab to set availability'}
+            {isAdmin ? 'Tap any cell to toggle' : isMember && (myClaimedPlayer || myGuardedPlayerIds.size > 0) ? 'Tap your row to update availability' : 'View only'}
           </Text>
         </View>
       )}
@@ -1019,11 +1038,19 @@ const styles = StyleSheet.create({
     padding: 6, gap: 2,
     borderRightWidth: 1, borderRightColor: '#e5e5e4',
     borderBottomWidth: 1, borderBottomColor: '#e5e5e4',
+    backgroundColor: '#fff',
+  },
+  dateRow: {
+    alignItems: 'center', justifyContent: 'center',
+    borderRightWidth: 1, borderRightColor: '#e5e5e4',
+    borderBottomWidth: 1, borderBottomColor: '#e5e5e4',
     backgroundColor: '#f7f7f5',
   },
+  dateRowText: { fontSize: 11, fontWeight: '700', color: '#1a5c2e' },
   gameHeaderDate: { fontSize: 11, fontWeight: '700', color: '#1a5c2e' },
   gameHeaderOpponent: { fontSize: 11, color: '#333', textAlign: 'center', lineHeight: 14 },
-  haChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  gameHeaderTime: { fontSize: 10, color: '#888', textAlign: 'center' },
+  haChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexShrink: 1 },
   homeChip: { backgroundColor: '#edf6f0' },
   awayChip: { backgroundColor: '#fef9f0' },
   tbdChip: { backgroundColor: '#f0f0ef' },

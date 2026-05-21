@@ -2,6 +2,7 @@ import {
   collection,
   doc,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   getDoc,
@@ -16,7 +17,7 @@ import {
   Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './config';
-import { Team, League, Player, LeagueInvite, TeamInvite, Schedule, ScheduleConfig, TeamGame, Scorecard, ScorecardHalfInning, TeamRole } from '../types';
+import { Team, League, Player, LeagueInvite, TeamInvite, Schedule, ScheduleConfig, TeamGame, Scorecard, ScorecardHalfInning, TeamRole, UserProfile } from '../types';
 
 function stripUndefined(obj: Record<string, any>): Record<string, any> {
   return Object.fromEntries(
@@ -195,7 +196,7 @@ export async function updateTeamGame(
   gameId: string,
   data: Partial<Omit<TeamGame, 'id'>>
 ): Promise<void> {
-  await updateDoc(doc(db, 'teams', teamId, 'games', gameId), data);
+  await updateDoc(doc(db, 'teams', teamId, 'games', gameId), stripUndefined(data as Record<string, any>));
 }
 
 export async function deleteTeamGame(teamId: string, gameId: string): Promise<void> {
@@ -214,6 +215,23 @@ export function subscribeToTeamGames(
     },
     () => onUpdate([])
   );
+}
+
+// ── User profile (extra fields beyond Firebase Auth) ─────────────────────────
+
+export function subscribeToUserProfile(
+  userId: string,
+  onUpdate: (profile: UserProfile) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'users', userId),
+    (snap) => onUpdate((snap.data() ?? {}) as UserProfile),
+    () => onUpdate({})
+  );
+}
+
+export async function updateUserProfile(userId: string, data: Partial<UserProfile>): Promise<void> {
+  await setDoc(doc(db, 'users', userId), data, { merge: true });
 }
 
 // ── League Invites ────────────────────────────────────────────────────────────
@@ -306,7 +324,7 @@ export async function acceptTeamInvite(inviteId: string, acceptedByUid: string, 
 
   // arrayUnion avoids a read — also works around the permission catch-22 where
   // the invitee isn't yet a member and can't read the team to compute the new array.
-  const fieldKey = role === 'viewer' ? 'viewerIds' : 'coAdminIds';
+  const fieldKey = role === 'editor' ? 'coAdminIds' : role === 'member' ? 'memberIds' : 'viewerIds';
   await updateDoc(doc(db, 'teams', teamId), {
     [fieldKey]: arrayUnion(acceptedByUid),
     updatedAt: serverTimestamp(),
