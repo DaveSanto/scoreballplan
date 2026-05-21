@@ -139,7 +139,7 @@ function parseScheduleCsv(text: string): {
 } {
   const errors: string[] = [];
   const games: Omit<TeamGame, 'id'>[] = [];
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
   if (lines.length < 2) {
     return { games: [], errors: ['File appears empty or has no data rows.'] };
   }
@@ -169,7 +169,20 @@ function parseScheduleCsv(text: string): {
   return { games, errors };
 }
 
-const CSV_TEMPLATE = `Date,Opponent,Location,Time,Home/Away,Type
+const CSV_TEMPLATE = `# ScoreBall Schedule Import Template
+# Lines starting with # are ignored.
+#
+# VALID TYPES (column F — must match exactly):
+#   Regular Season, Tournament, Exhibition
+#   Playoff - Wild Card, Playoff - Divisional, Playoff - Conference
+#   Playoff - Semifinal, Playoff - Championship
+#   Practice, Scrimmage, Meeting, Rainout (Makeup)
+#   Banquet, Team Party, Other
+# If left blank or unrecognized, defaults to: Regular Season
+#
+# HOME/AWAY (column E): Home, Away, TBD (or leave blank for TBD)
+# DATE (column A): YYYY-MM-DD or MM/DD/YYYY
+Date,Opponent,Location,Time,Home/Away,Type
 2026-06-15,Tigers,Central Park,6:30 PM,Home,Regular Season
 2026-06-22,Bears,North Field,8:00 PM,Away,Regular Season
 `;
