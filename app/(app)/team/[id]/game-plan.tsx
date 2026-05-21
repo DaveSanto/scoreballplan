@@ -54,7 +54,8 @@ function formatGameLabel(game: TeamGame, teamName: string): string {
     : game.isHome === false
     ? `${teamName} @ ${game.opponent}`
     : `${teamName} vs. ${game.opponent} (TBD)`;
-  return `${datePart} · ${matchup}`;
+  const typePart = (game.gameType && game.gameType !== 'Regular Season') ? ` · ${game.gameType}` : '';
+  return `${datePart} · ${matchup}${typePart}`;
 }
 
 type Tab = 'order' | 'rotation';

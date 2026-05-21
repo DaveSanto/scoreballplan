@@ -30,7 +30,7 @@ import {
 // ── Grid layout constants ─────────────────────────────────────────────────────
 const PLAYER_COL_W = 148;
 const GAME_COL_W = 90;
-const HEADER_H = 80;
+const HEADER_H = 96;
 const ROW_H = 48;
 
 // ── Sort ──────────────────────────────────────────────────────────────────────
@@ -408,10 +408,19 @@ export default function ScheduleScreen() {
                         <Text style={styles.gameHeaderOpponent} numberOfLines={2}>
                           {game.opponent}
                         </Text>
-                        <View style={[styles.haChip, game.isHome === true ? styles.homeChip : game.isHome === false ? styles.awayChip : styles.tbdChip]}>
-                          <Text style={[styles.haText, game.isHome === true ? styles.homeText : game.isHome === false ? styles.awayText : styles.tbdText]}>
-                            {game.isHome === true ? 'Home' : game.isHome === false ? 'Away' : 'TBD'}
-                          </Text>
+                        <View style={{ flexDirection: 'row', gap: 3, flexWrap: 'wrap' }}>
+                          <View style={[styles.haChip, game.isHome === true ? styles.homeChip : game.isHome === false ? styles.awayChip : styles.tbdChip]}>
+                            <Text style={[styles.haText, game.isHome === true ? styles.homeText : game.isHome === false ? styles.awayText : styles.tbdText]}>
+                              {game.isHome === true ? 'Home' : game.isHome === false ? 'Away' : 'TBD'}
+                            </Text>
+                          </View>
+                          {(game.gameType ?? 'Regular Season') !== 'Regular Season' && (
+                            <View style={[styles.haChip, styles.typeHeaderChip]}>
+                              <Text style={[styles.haText, styles.typeHeaderText]} numberOfLines={1}>
+                                {game.gameType}
+                              </Text>
+                            </View>
+                          )}
                         </View>
                       </Pressable>
                     ))}
@@ -1058,6 +1067,8 @@ const styles = StyleSheet.create({
   toggleChipActive: { borderColor: '#1a5c2e', backgroundColor: '#edf6f0' },
   toggleChipText: { fontSize: 14, fontWeight: '500', color: '#888' },
   toggleChipTextActive: { color: '#1a5c2e', fontWeight: '700' },
+  typeHeaderChip: { backgroundColor: '#eef2ff' },
+  typeHeaderText: { color: '#4a6cf7' },
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 },
   typeChip: {
     paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8,
