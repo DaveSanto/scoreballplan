@@ -75,12 +75,14 @@
 
   .name-section { max-width: 400px; margin: 0 auto 20px; text-align: center; }
   .name-section label { display: block; color: #aaa; font-size: 0.9rem; margin-bottom: 8px; }
-  .name-section input {
+  .name-section input, .name-section select {
     width: 100%; padding: 12px 16px; border-radius: 10px;
     border: 2px solid #2a3a50; background: #1a2535; color: #f0f0f0;
     font-size: 1rem; outline: none; transition: border 0.2s;
+    appearance: none; -webkit-appearance: none;
   }
-  .name-section input:focus { border-color: #f5c842; }
+  .name-section input:focus, .name-section select:focus { border-color: #f5c842; }
+  .name-section select option { background: #1a2535; }
 
   .action-row { display: flex; gap: 12px; justify-content: center; align-items: center; margin-bottom: 8px; }
   .submit-btn {
@@ -183,7 +185,7 @@
 
   <div class="name-section">
     <label>Your name (so we know who voted)</label>
-    <input type="text" id="voterName" placeholder="e.g. Dave S." />
+    <div id="nameField"></div>
   </div>
 
   <div class="progress-row">
@@ -226,6 +228,43 @@ const app = initializeApp({
 const db = getFirestore(app);
 const SURVEY_ID = 'ravenwood_brewers_hat';
 const votesCol = collection(db, 'surveys', SURVEY_ID, 'votes');
+
+// ── Name field (dropdown or text input) ───────────────────────────────────────
+const urlPlayers = new URLSearchParams(window.location.search).get('players');
+const rosterNames = urlPlayers ? urlPlayers.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+function buildNameField() {
+  const container = document.getElementById('nameField');
+  if (rosterNames.length > 0) {
+    const sel = document.createElement('select');
+    sel.id = 'voterName';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Select your name…';
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    sel.appendChild(placeholder);
+    rosterNames.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', updateSubmitBtn);
+    container.appendChild(sel);
+  } else {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'voterName';
+    input.placeholder = 'e.g. Dave S.';
+    input.addEventListener('input', updateSubmitBtn);
+    container.appendChild(input);
+  }
+}
+
+function getVoterName() {
+  return (document.getElementById('voterName')?.value ?? '').trim();
+}
 
 const HATS = [
   { id: 'hat1', label: '212 — Navy/Gold', sub: 'Richardson 212 Fitted',
@@ -308,16 +347,14 @@ function updateGrid() {
   document.getElementById('progressFill').style.width = `${(n / total) * 100}%`;
   document.getElementById('progressLabel').textContent = `${n} of ${total} ranked`;
 
-  const name = document.getElementById('voterName').value.trim();
-  document.getElementById('submitBtn').disabled = !(n === total && name);
+  document.getElementById('submitBtn').disabled = !(n === total && getVoterName());
 }
 
-document.getElementById('voterName').addEventListener('input', updateGrid);
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 
 async function submitVote() {
-  const name = document.getElementById('voterName').value.trim();
+  const name = getVoterName();
   if (!name || ranking.length !== HATS.length) return;
 
   const btn = document.getElementById('submitBtn');
@@ -490,6 +527,7 @@ function showError(msg) {
   b.textContent = msg;
 }
 
+buildNameField();
 buildGrid();
 </script>
 </body>

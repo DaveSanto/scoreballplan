@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useApp } from '../../src/store/AppContext';
 
 const BASE_URL = 'https://scoreball.santopietro.com/surveys';
 
@@ -16,11 +17,16 @@ const SURVEYS: Record<string, { title: string; description: string; file: string
 };
 
 export default function SurveyScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, teamId } = useLocalSearchParams<{ id: string; teamId?: string }>();
+  const { getTeamPlayers } = useApp();
   const survey = SURVEYS[id ?? ''];
   const [opening, setOpening] = useState(false);
 
-  const url = survey ? `${BASE_URL}/${survey.file}` : null;
+  const playerNames = teamId ? getTeamPlayers(teamId).map(p => p.name) : [];
+  const playersParam = playerNames.length > 0
+    ? '?players=' + encodeURIComponent(playerNames.join(','))
+    : '';
+  const url = survey ? `${BASE_URL}/${survey.file}${playersParam}` : null;
 
   useEffect(() => {
     if (url) openSurvey();
