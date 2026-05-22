@@ -181,6 +181,22 @@ export function subscribeToLeagues(ownerId: string, onUpdate: (leagues: League[]
   }, () => onUpdate([]));
 }
 
+export function subscribeToLeaguesByAssistantAdmin(userId: string, onUpdate: (leagues: League[]) => void): Unsubscribe {
+  const q = query(collection(db, 'leagues'), where('leagueAssistantAdminIds', 'array-contains', userId));
+  return onSnapshot(q, (snap) => {
+    const leagues = snap.docs.map((d) => ({ id: d.id, ...d.data() } as League));
+    onUpdate(leagues.sort((a, b) => a.name.localeCompare(b.name)));
+  }, () => onUpdate([]));
+}
+
+export async function addLeagueAssistantAdmin(leagueId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db, 'leagues', leagueId), { leagueAssistantAdminIds: arrayUnion(uid), updatedAt: serverTimestamp() });
+}
+
+export async function removeLeagueAssistantAdmin(leagueId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db, 'leagues', leagueId), { leagueAssistantAdminIds: arrayRemove(uid), updatedAt: serverTimestamp() });
+}
+
 // ── Team Games (subcollection: teams/{teamId}/games) ─────────────────────────
 
 export async function addTeamGame(teamId: string, data: Omit<TeamGame, 'id'>): Promise<string> {
@@ -281,6 +297,10 @@ export async function acceptInvite(inviteId: string, acceptedByUid: string, team
 
 export async function declineInvite(inviteId: string): Promise<void> {
   await updateDoc(doc(db, 'leagueInvites', inviteId), { status: 'declined' });
+}
+
+export async function deleteLeagueInvite(inviteId: string): Promise<void> {
+  await deleteDoc(doc(db, 'leagueInvites', inviteId));
 }
 
 // ── Team Invites (co-admin access) ────────────────────────────────────────────

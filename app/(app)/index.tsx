@@ -189,6 +189,12 @@ export default function DashboardScreen() {
               <TeamCard
                 team={item}
                 isOwner={item.ownerId === user?.uid}
+                role={
+                  item.ownerId === user?.uid ? 'owner'
+                  : (item.coAdminIds ?? []).includes(user?.uid ?? '') ? 'coach'
+                  : (item.memberIds ?? []).includes(user?.uid ?? '') ? 'member'
+                  : 'fan'
+                }
                 onPress={() => router.push(`/(app)/team/${item.id}`)}
                 onDelete={() => setDeleteTarget({ kind: 'team', item })}
               />
@@ -344,14 +350,22 @@ function EmptyState({
   );
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  coach: 'Coach',
+  member: 'Member',
+  fan: 'Fan',
+};
+
 function TeamCard({
   team,
   isOwner,
+  role,
   onPress,
   onDelete,
 }: {
   team: Team;
   isOwner: boolean;
+  role: 'owner' | 'coach' | 'member' | 'fan';
   onPress: () => void;
   onDelete: () => void;
 }) {
@@ -364,7 +378,7 @@ function TeamCard({
       <Text style={styles.cardMeta}>{team.playerIds.length} players</Text>
       {!isOwner && (
         <View style={styles.coAdminBadge}>
-          <Text style={styles.coAdminBadgeText}>Coach</Text>
+          <Text style={styles.coAdminBadgeText}>{ROLE_LABELS[role] ?? 'Member'}</Text>
         </View>
       )}
       {isOwner && (

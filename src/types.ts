@@ -132,6 +132,7 @@ export type League = {
   sport: Sport;
   season: string;
   ownerId: string;
+  leagueAssistantAdminIds?: string[];
   teamIds: string[];
   scheduleConfig?: ScheduleConfig;
   schedule?: Schedule;

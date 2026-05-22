@@ -22,6 +22,7 @@ import {
   updateLeague as dbUpdateLeague,
   deleteLeague as dbDeleteLeague,
   subscribeToLeagues,
+  subscribeToLeaguesByAssistantAdmin,
 } from '../firebase/db';
 
 type AppContextType = {
@@ -168,10 +169,24 @@ export function AppProvider({
       mergeTeams();
     });
 
-    const unsubLeagues = subscribeToLeagues(userId, (l) => {
-      setLeagues(l);
+    let ownedLeagues: League[] = [];
+    let assistantLeagues: League[] = [];
+    function mergeLeagues() {
+      const merged = [...ownedLeagues];
+      for (const l of assistantLeagues) {
+        if (!merged.find((x) => x.id === l.id)) merged.push(l);
+      }
+      setLeagues(merged.sort((a, b) => a.name.localeCompare(b.name)));
       loadedRef.current.leagues = true;
       checkDone();
+    }
+    const unsubLeagues = subscribeToLeagues(userId, (l) => {
+      ownedLeagues = l;
+      mergeLeagues();
+    });
+    const unsubAssistantLeagues = subscribeToLeaguesByAssistantAdmin(userId, (l) => {
+      assistantLeagues = l;
+      mergeLeagues();
     });
 
     // Subscribe to players added by this user AND players claimed by this user
@@ -194,6 +209,7 @@ export function AppProvider({
       unsubMemberTeams();
       unsubViewerTeams();
       unsubLeagues();
+      unsubAssistantLeagues();
       unsubOwned();
       unsubClaimed();
     };

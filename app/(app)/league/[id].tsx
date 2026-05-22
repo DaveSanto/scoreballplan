@@ -22,6 +22,7 @@ import { useApp } from '../../../src/store/AppContext';
 import {
   subscribeToInvitesByLeague,
   createInvite,
+  deleteLeagueInvite,
   createTeam as dbCreateTeam,
   updateTeam as dbUpdateTeam,
   saveSchedule,
@@ -223,6 +224,7 @@ export default function LeagueScreen() {
   const { leagues, teams, hiddenTeams, getTeamPlayers, addTeamToLeague, removeTeamFromLeague, unhideTeam, setLeagueRules } = useApp();
   const league = leagues.find((l) => l.id === leagueId);
   const isLeagueOwner = league?.ownerId === user?.uid;
+  const isLeagueAdmin = isLeagueOwner || (league?.leagueAssistantAdminIds ?? []).includes(user?.uid ?? '');
   const [activeTab, setActiveTab] = useState<Tab>('teams');
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
   const [rulesModalOpen, setRulesModalOpen] = useState(false);
@@ -249,12 +251,12 @@ export default function LeagueScreen() {
       {/* Format row */}
       <Pressable
         style={styles.formatRow}
-        onPress={() => isLeagueOwner && setRulesModalOpen(true)}
-        disabled={!isLeagueOwner}
+        onPress={() => isLeagueAdmin && setRulesModalOpen(true)}
+        disabled={!isLeagueAdmin}
       >
         <Ionicons name="options-outline" size={15} color="#1a5c2e" />
         <Text style={styles.formatLabel}>Format: {formatLabel}</Text>
-        {isLeagueOwner && <Ionicons name="chevron-forward" size={14} color="#aaa" />}
+        {isLeagueAdmin && <Ionicons name="chevron-forward" size={14} color="#aaa" />}
       </Pressable>
 
       <View style={styles.tabs}>
@@ -356,6 +358,7 @@ export default function LeagueScreen() {
           leagueTeams={leagueTeams}
           invites={invites}
           invitedBy={user?.uid ?? ''}
+          isAdmin={isLeagueAdmin}
         />
       )}
 
@@ -1320,12 +1323,14 @@ function InvitesTab({
   leagueTeams,
   invites,
   invitedBy,
+  isAdmin,
 }: {
   leagueId: string;
   leagueName: string;
   leagueTeams: Team[];
   invites: LeagueInvite[];
   invitedBy: string;
+  isAdmin: boolean;
 }) {
   const [inviteModal, setInviteModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -1385,13 +1390,31 @@ function InvitesTab({
         )}
 
         {pending.length > 0 && <Text style={styles.inviteGroupLabel}>Pending</Text>}
-        {pending.map((inv) => <InviteRow key={inv.id} invite={inv} />)}
+        {pending.map((inv) => (
+          <InviteRow
+            key={inv.id}
+            invite={inv}
+            isAdmin={isAdmin}
+            onCancel={async () => {
+              Alert.alert('Cancel Invite', `Cancel invite to ${inv.invitedEmail}?`, [
+                { text: 'No', style: 'cancel' },
+                {
+                  text: 'Cancel Invite', style: 'destructive',
+                  onPress: async () => {
+                    try { await deleteLeagueInvite(inv.id); }
+                    catch (e: any) { Alert.alert('Error', e?.message ?? 'Failed to cancel invite.'); }
+                  },
+                },
+              ]);
+            }}
+          />
+        ))}
 
         {accepted.length > 0 && <Text style={styles.inviteGroupLabel}>Accepted</Text>}
-        {accepted.map((inv) => <InviteRow key={inv.id} invite={inv} />)}
+        {accepted.map((inv) => <InviteRow key={inv.id} invite={inv} isAdmin={false} onCancel={() => {}} />)}
 
         {declined.length > 0 && <Text style={styles.inviteGroupLabel}>Declined</Text>}
-        {declined.map((inv) => <InviteRow key={inv.id} invite={inv} />)}
+        {declined.map((inv) => <InviteRow key={inv.id} invite={inv} isAdmin={false} onCancel={() => {}} />)}
       </ScrollView>
 
       <InviteFormModal
@@ -1405,7 +1428,7 @@ function InvitesTab({
   );
 }
 
-function InviteRow({ invite }: { invite: LeagueInvite }) {
+function InviteRow({ invite, isAdmin, onCancel }: { invite: LeagueInvite; isAdmin: boolean; onCancel: () => void }) {
   const statusColor = invite.status === 'accepted' ? '#1a5c2e' : invite.status === 'declined' ? '#c0392b' : '#f39c12';
 
   return (
@@ -1419,6 +1442,11 @@ function InviteRow({ invite }: { invite: LeagueInvite }) {
           {invite.status.charAt(0).toUpperCase() + invite.status.slice(1)}
         </Text>
       </View>
+      {isAdmin && invite.status === 'pending' && (
+        <Pressable onPress={onCancel} style={{ marginLeft: 8, padding: 4 }} hitSlop={8}>
+          <Ionicons name="trash-outline" size={18} color="#c0392b" />
+        </Pressable>
+      )}
     </View>
   );
 }

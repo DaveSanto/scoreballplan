@@ -52,6 +52,10 @@ service cloud.firestore {
                     && request.auth.uid == request.resource.data.ownerId;
       allow read, update, delete: if request.auth != null
                                   && request.auth.uid == resource.data.ownerId;
+      // League assistant admins can read and update but not delete
+      allow read, update: if request.auth != null
+                          && resource.data.leagueAssistantAdminIds != null
+                          && request.auth.uid in resource.data.leagueAssistantAdminIds;
       // Captains of teams in this league can read the league (for schedule, invites)
       allow read: if request.auth != null;
     }
