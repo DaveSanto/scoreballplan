@@ -528,17 +528,18 @@ function showError(msg) {
   b.textContent = msg;
 }
 
-async function init() {
-  if (teamId) {
-    try {
-      const rosterSnap = await getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId));
-      if (rosterSnap.exists()) rosterNames = rosterSnap.data().players ?? [];
-    } catch (_) {}
-  }
+// Build hats immediately — never block on Firestore
+buildGrid();
+
+// Load roster in background, then build name field when done
+if (teamId) {
+  getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId))
+    .then(snap => { if (snap.exists()) rosterNames = snap.data().players ?? []; })
+    .catch(() => {})
+    .finally(() => buildNameField());
+} else {
   buildNameField();
-  buildGrid();
 }
-init();
 </script>
 </body>
 </html>
