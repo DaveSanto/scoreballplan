@@ -233,14 +233,6 @@ const votesCol = collection(db, 'surveys', SURVEY_ID, 'votes');
 // ── Name field (dropdown or text input) ───────────────────────────────────────
 const teamId = new URLSearchParams(window.location.search).get('teamId');
 let rosterNames = [];
-if (teamId) {
-  try {
-    const rosterSnap = await getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId));
-    if (rosterSnap.exists()) rosterNames = rosterSnap.data().players ?? [];
-  } catch (_) {
-    // Rules not yet deployed or no roster written — fall back to text input
-  }
-}
 
 function buildNameField() {
   const container = document.getElementById('nameField');
@@ -536,8 +528,17 @@ function showError(msg) {
   b.textContent = msg;
 }
 
-buildNameField();
-buildGrid();
+async function init() {
+  if (teamId) {
+    try {
+      const rosterSnap = await getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId));
+      if (rosterSnap.exists()) rosterNames = rosterSnap.data().players ?? [];
+    } catch (_) {}
+  }
+  buildNameField();
+  buildGrid();
+}
+init();
 </script>
 </body>
 </html>
