@@ -4,6 +4,7 @@ import { useGlobalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { upsertSurveyRoster } from '../../../../src/firebase/db';
 import { useApp } from '../../../../src/store/AppContext';
 
 const BASE_URL = 'https://scoreball.santopietro.com/surveys';
@@ -22,21 +23,22 @@ export default function PollsScreen() {
   const { getTeamPlayers } = useApp();
   const [opening, setOpening] = useState<string | null>(null);
 
-  const playerNames = teamId ? getTeamPlayers(teamId).map(p => p.name) : [];
-  const playersParam = playerNames.length > 0
-    ? '?players=' + encodeURIComponent(playerNames.join(','))
-    : '';
-
   async function openSurvey(surveyId: string, file: string) {
-    const url = `${BASE_URL}/${file}${playersParam}`;
     setOpening(surveyId);
-    if (Platform.OS === 'web') {
-      window.open(url, '_blank');
-      setOpening(null);
-    } else {
-      await WebBrowser.openBrowserAsync(url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FORM_SHEET,
-      });
+    try {
+      const playerNames = teamId ? getTeamPlayers(teamId).map(p => p.name) : [];
+      if (playerNames.length > 0) {
+        await upsertSurveyRoster(surveyId, teamId, playerNames);
+      }
+      const url = `${BASE_URL}/${file}?teamId=${encodeURIComponent(teamId)}`;
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+      } else {
+        await WebBrowser.openBrowserAsync(url, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FORM_SHEET,
+        });
+      }
+    } finally {
       setOpening(null);
     }
   }

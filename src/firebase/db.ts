@@ -447,6 +447,10 @@ export function subscribeToTeamScorecards(
   );
 }
 
+export async function upsertSurveyRoster(surveyId: string, teamId: string, players: string[]): Promise<void> {
+  await setDoc(doc(db, 'surveys', surveyId, 'rosters', teamId), { players, updatedAt: serverTimestamp() });
+}
+
 export function subscribeToOwnerScorecards(
   ownerId: string,
   onUpdate: (scorecards: Scorecard[]) => void
