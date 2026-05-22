@@ -267,6 +267,10 @@ function getVoterName() {
   return (document.getElementById('voterName')?.value ?? '').trim();
 }
 
+function updateSubmitBtn() {
+  document.getElementById('submitBtn').disabled = !(ranking.length === HATS.length && getVoterName());
+}
+
 const HATS = [
   { id: 'hat1', label: '212 — Navy/Gold', sub: 'Richardson 212 Fitted',
     img: 'https://richardson.picarioxpo.com/212_FINAL.pfs?1=1&width=600&height=356&p.tn=Navy.jpg,Navy.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg' },
