@@ -25,6 +25,7 @@ export default function AppLayout() {
         <Stack.Screen name="team/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="league/[id]" options={{ title: 'League' }} />
         <Stack.Screen name="scorecard/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="survey/[id]" options={{ headerShown: false }} />
       </Stack>
     </AppProvider>
   );

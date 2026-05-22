@@ -568,7 +568,7 @@ export default function ScorecardScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(app)')}  style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color="#1a5c2e" />
         </Pressable>
         <View style={styles.headerInfo}>

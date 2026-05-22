@@ -76,7 +76,7 @@ export default function TeamInviteScreen() {
           </View>
           <Text style={styles.heading}>You're in!</Text>
           <Text style={styles.sub}>
-            You now have co-admin access to <Text style={styles.bold}>{invite?.teamName}</Text>.
+            You joined <Text style={styles.bold}>{invite?.teamName}</Text> as a {invite?.role === 'editor' ? 'co-captain' : invite?.role === 'member' ? 'team member' : 'viewer'}.
           </Text>
           <Pressable
             style={styles.primaryBtn}
@@ -102,7 +102,7 @@ export default function TeamInviteScreen() {
         <Text style={styles.inviteLabel}>You've been invited to join</Text>
         <Text style={styles.teamName}>{invite?.teamName}</Text>
         <Text style={styles.sub}>
-          as a team {invite?.role === 'viewer' ? 'viewer (read-only)' : 'coach / co-admin'}
+          as a {invite?.role === 'editor' ? 'co-captain / editor' : invite?.role === 'member' ? 'team member' : 'viewer (read-only)'}
         </Text>
 
         {(isExpired || isAlreadyHandled) && (

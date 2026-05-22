@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useApp } from '../../src/store/AppContext';
+import { useApp } from '../../../src/store/AppContext';
 
 const BASE_URL = 'https://scoreball.santopietro.com/surveys';
 
@@ -47,7 +47,7 @@ export default function SurveyScreen() {
         <View style={styles.center}>
           <Ionicons name="alert-circle-outline" size={56} color="#ccc" />
           <Text style={styles.heading}>Survey Not Found</Text>
-          <Pressable style={styles.btn} onPress={() => router.back()}>
+          <Pressable style={styles.btn} onPress={() => router.canGoBack() ? router.back() : router.replace('/(app)')} >
             <Text style={styles.btnText}>Go Back</Text>
           </Pressable>
         </View>
@@ -70,7 +70,7 @@ export default function SurveyScreen() {
         >
           <Text style={styles.btnText}>{opening ? 'Opening…' : 'Open Survey'}</Text>
         </Pressable>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(app)')}  style={styles.backLink}>
           <Text style={styles.backLinkText}>← Back</Text>
         </Pressable>
       </View>

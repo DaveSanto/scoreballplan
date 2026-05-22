@@ -10,12 +10,13 @@ import { useApp } from '../../../../src/store/AppContext';
 import { useAuth } from '../../../../src/store/AuthContext';
 import { DEFAULT_RULES } from '../../../../src/types';
 
-const VISIBLE_TABS = ['index', 'schedule', 'game-plan', 'history'];
+const VISIBLE_TABS = ['index', 'schedule', 'game-plan', 'history', 'polls'];
 const TAB_LABELS: Record<string, string> = {
   index: 'Roster',
   schedule: 'Schedule',
   'game-plan': 'Game Plan',
   history: 'History',
+  polls: 'Team Polls',
 };
 
 function TeamHeader({
@@ -42,7 +43,7 @@ function TeamHeader({
   return (
     <SafeAreaView edges={['top']} style={styles.headerOuter}>
       <View style={styles.headerRow}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(app)')} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color="#1a5c2e" />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>{teamName}</Text>
@@ -220,6 +221,7 @@ export default function TeamLayout() {
         <Tabs.Screen name="schedule" />
         <Tabs.Screen name="game-plan" />
         <Tabs.Screen name="history" />
+        <Tabs.Screen name="polls" />
         <Tabs.Screen name="scoresheet" options={{ href: null }} />
       </Tabs>
 

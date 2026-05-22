@@ -9,6 +9,7 @@ import {
   unhideTeamFromView as dbUnhideTeam,
   subscribeToTeams,
   subscribeToTeamsByCoAdmin,
+  subscribeToTeamsByMember,
   subscribeToTeamsByViewer,
   createPlayer as dbCreatePlayer,
   updatePlayer as dbUpdatePlayer,
@@ -119,16 +120,18 @@ export function AppProvider({
     // Invited teams always sort first so newly accepted invites are immediately visible.
     let ownedTeams: Team[] = [];
     let coAdminTeams: Team[] = [];
+    let memberTeams: Team[] = [];
     let viewerTeams: Team[] = [];
     let ownedLoaded = false;
     let coAdminLoaded = false;
+    let memberLoaded = false;
     let viewerLoaded = false;
 
     const mergeTeams = () => {
-      if (!ownedLoaded || !coAdminLoaded || !viewerLoaded) return;
+      if (!ownedLoaded || !coAdminLoaded || !memberLoaded || !viewerLoaded) return;
       const seen = new Set<string>();
       const merged: Team[] = [];
-      for (const t of [...coAdminTeams, ...viewerTeams]) {
+      for (const t of [...coAdminTeams, ...memberTeams, ...viewerTeams]) {
         if (!seen.has(t.id)) { seen.add(t.id); merged.push(t); }
       }
       for (const t of ownedTeams) {
@@ -150,6 +153,12 @@ export function AppProvider({
     const unsubCoAdminTeams = subscribeToTeamsByCoAdmin(userId, (t) => {
       coAdminTeams = t;
       coAdminLoaded = true;
+      mergeTeams();
+    });
+
+    const unsubMemberTeams = subscribeToTeamsByMember(userId, (t) => {
+      memberTeams = t;
+      memberLoaded = true;
       mergeTeams();
     });
 
@@ -182,6 +191,7 @@ export function AppProvider({
     return () => {
       unsubTeams();
       unsubCoAdminTeams();
+      unsubMemberTeams();
       unsubViewerTeams();
       unsubLeagues();
       unsubOwned();

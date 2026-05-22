@@ -353,6 +353,17 @@ export function subscribeToTeamsByCoAdmin(userId: string, onUpdate: (teams: Team
   }, () => onUpdate([]));
 }
 
+export function subscribeToTeamsByMember(userId: string, onUpdate: (teams: Team[]) => void): Unsubscribe {
+  const q = query(collection(db, 'teams'), where('memberIds', 'array-contains', userId));
+  return onSnapshot(q, (snap) => {
+    const teams = snap.docs.map((d) => {
+      const data = d.data();
+      return { id: d.id, ...data, playerIds: data.playerIds ?? [], battingOrder: data.battingOrder ?? [], absentPlayerIds: data.absentPlayerIds ?? [] } as Team;
+    });
+    onUpdate(teams.sort((a, b) => a.name.localeCompare(b.name)));
+  }, () => onUpdate([]));
+}
+
 export function subscribeToInvitesByLeague(
   leagueId: string,
   onUpdate: (invites: LeagueInvite[]) => void

@@ -1,5 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
@@ -9,8 +7,6 @@ import { AuthProvider } from '../src/store/AuthContext';
 WebBrowser.maybeCompleteAuthSession();
 
 export default function RootLayout() {
-  useFonts({ ...Ionicons.font });
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
