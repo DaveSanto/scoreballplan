@@ -214,7 +214,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, setDoc, onSnapshot, serverTimestamp }
+import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const app = initializeApp({
@@ -231,8 +231,12 @@ const SURVEY_ID = 'ravenwood_brewers_hat';
 const votesCol = collection(db, 'surveys', SURVEY_ID, 'votes');
 
 // ── Name field (dropdown or text input) ───────────────────────────────────────
-const urlPlayers = new URLSearchParams(window.location.search).get('players');
-const rosterNames = urlPlayers ? urlPlayers.split(',').map(s => s.trim()).filter(Boolean) : [];
+const teamId = new URLSearchParams(window.location.search).get('teamId');
+let rosterNames = [];
+if (teamId) {
+  const rosterSnap = await getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId));
+  if (rosterSnap.exists()) rosterNames = rosterSnap.data().players ?? [];
+}
 
 function buildNameField() {
   const container = document.getElementById('nameField');
