@@ -234,8 +234,12 @@ const votesCol = collection(db, 'surveys', SURVEY_ID, 'votes');
 const teamId = new URLSearchParams(window.location.search).get('teamId');
 let rosterNames = [];
 if (teamId) {
-  const rosterSnap = await getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId));
-  if (rosterSnap.exists()) rosterNames = rosterSnap.data().players ?? [];
+  try {
+    const rosterSnap = await getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId));
+    if (rosterSnap.exists()) rosterNames = rosterSnap.data().players ?? [];
+  } catch (_) {
+    // Rules not yet deployed or no roster written — fall back to text input
+  }
 }
 
 function buildNameField() {

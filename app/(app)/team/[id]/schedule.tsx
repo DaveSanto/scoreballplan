@@ -228,6 +228,8 @@ export default function ScheduleScreen() {
   const [csvModal, setCsvModal] = useState(false);
   const [clearSeasonConfirm, setClearSeasonConfirm] = useState(false);
   const fileInputRef = useRef<any>(null);
+  const headerScrollRef = useRef<ScrollView>(null);
+  const bodyScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (!teamId) return;
@@ -407,32 +409,18 @@ export default function ScheduleScreen() {
           )}
 
           {/* Grid */}
-          <ScrollView style={styles.gridScroll} bounces={false}>
+          <View style={styles.gridScroll}>
+            {/* Frozen header rows */}
             <View style={styles.gridRow}>
-              {/* Fixed left: player names */}
-              <View style={{ width: PLAYER_COL_W }}>
-                <View style={[styles.cornerCell, { height: DATE_ROW_H + HEADER_H }]}>
-                  <Text style={styles.cornerLabel}>Player</Text>
-                </View>
-                {sortedPlayers.map((player, i) => (
-                  <View
-                    key={player.id}
-                    style={[styles.playerNameCell, { height: ROW_H }, i % 2 === 1 && styles.altRow]}
-                  >
-                    <View style={styles.badgeSm}>
-                      <Text style={styles.badgeSmNum}>#{player.number || '—'}</Text>
-                    </View>
-                    <Text style={styles.playerNameText} numberOfLines={1}>{player.name}</Text>
-                  </View>
-                ))}
+              <View style={[styles.cornerCell, { height: DATE_ROW_H + HEADER_H, width: PLAYER_COL_W }]}>
+                <Text style={styles.cornerLabel}>Player</Text>
               </View>
-
-              {/* Scrollable right: game columns */}
               <ScrollView
+                ref={headerScrollRef}
                 horizontal
-                showsHorizontalScrollIndicator
+                scrollEnabled={false}
+                showsHorizontalScrollIndicator={false}
                 style={styles.gameScrollArea}
-                nestedScrollEnabled
               >
                 <View>
                   {/* Date row */}
@@ -443,7 +431,6 @@ export default function ScheduleScreen() {
                       </View>
                     ))}
                   </View>
-
                   {/* Game info row */}
                   <View style={{ flexDirection: 'row' }}>
                     {games.map((game) => (
@@ -480,42 +467,79 @@ export default function ScheduleScreen() {
                       </Pressable>
                     ))}
                   </View>
-
-                  {/* Player data rows */}
-                  {sortedPlayers.map((player, i) => {
-                    const isMyRow = player.id === myClaimedPlayer?.id || myGuardedPlayerIds.has(player.id);
-                    const canToggle = isAdmin || (isMember && isMyRow);
-                    return (
-                      <View
-                        key={player.id}
-                        style={[{ flexDirection: 'row', height: ROW_H }, i % 2 === 1 && styles.altRow]}
-                      >
-                        {games.map((game) => {
-                          const isAbsent = (game.absentPlayerIds ?? []).includes(player.id);
-                          return (
-                            <Pressable
-                              key={game.id}
-                              style={[styles.dataCell, { width: GAME_COL_W }]}
-                              onPress={canToggle ? () => toggleAvailability(game, player.id) : undefined}
-                              disabled={!canToggle}
-                            >
-                              <View
-                                style={[
-                                  styles.availDot,
-                                  isAbsent ? styles.availDotOut : styles.availDotIn,
-                                  canToggle && styles.availDotTappable,
-                                ]}
-                              />
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    );
-                  })}
                 </View>
               </ScrollView>
             </View>
-          </ScrollView>
+
+            {/* Scrollable body: player names + data */}
+            <ScrollView bounces={false}>
+              <View style={styles.gridRow}>
+                {/* Fixed left: player names */}
+                <View style={{ width: PLAYER_COL_W }}>
+                  {sortedPlayers.map((player, i) => (
+                    <View
+                      key={player.id}
+                      style={[styles.playerNameCell, { height: ROW_H }, i % 2 === 1 && styles.altRow]}
+                    >
+                      <View style={styles.badgeSm}>
+                        <Text style={styles.badgeSmNum}>#{player.number || '—'}</Text>
+                      </View>
+                      <Text style={styles.playerNameText} numberOfLines={1}>{player.name}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Scrollable right: player data rows */}
+                <ScrollView
+                  ref={bodyScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator
+                  style={styles.gameScrollArea}
+                  nestedScrollEnabled
+                  scrollEventThrottle={16}
+                  onScroll={(e) => {
+                    headerScrollRef.current?.scrollTo({
+                      x: e.nativeEvent.contentOffset.x,
+                      animated: false,
+                    });
+                  }}
+                >
+                  <View>
+                    {sortedPlayers.map((player, i) => {
+                      const isMyRow = player.id === myClaimedPlayer?.id || myGuardedPlayerIds.has(player.id);
+                      const canToggle = isAdmin || (isMember && isMyRow);
+                      return (
+                        <View
+                          key={player.id}
+                          style={[{ flexDirection: 'row', height: ROW_H }, i % 2 === 1 && styles.altRow]}
+                        >
+                          {games.map((game) => {
+                            const isAbsent = (game.absentPlayerIds ?? []).includes(player.id);
+                            return (
+                              <Pressable
+                                key={game.id}
+                                style={[styles.dataCell, { width: GAME_COL_W }]}
+                                onPress={canToggle ? () => toggleAvailability(game, player.id) : undefined}
+                                disabled={!canToggle}
+                              >
+                                <View
+                                  style={[
+                                    styles.availDot,
+                                    isAbsent ? styles.availDotOut : styles.availDotIn,
+                                    canToggle && styles.availDotTappable,
+                                  ]}
+                                />
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            </ScrollView>
+          </View>
         </>
       )}
 
