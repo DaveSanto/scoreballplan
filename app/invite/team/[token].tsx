@@ -129,10 +129,7 @@ export default function TeamInviteScreen() {
         {user && !isExpired && !isAlreadyHandled && isWrongEmail && (
           <View style={styles.warningBox}>
             <Text style={styles.warningText}>
-              This invite is for {invite?.invitedEmail}. You're signed in as {user.email}.
-            </Text>
-            <Text style={[styles.warningText, { marginTop: 6 }]}>
-              Sign in with the correct account to accept.
+              This invite was not intended for you. Please contact your team admin for a new invite.
             </Text>
           </View>
         )}
