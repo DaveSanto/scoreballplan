@@ -217,7 +217,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, setDoc, onSnapshot, serverTimestamp }
+import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const app = initializeApp({
@@ -237,7 +237,7 @@ const votesCol = collection(db, 'surveys', SURVEY_ID, 'votes');
 const playersParam = new URLSearchParams(window.location.search).get('players');
 const rosterNames = playersParam
   ? decodeURIComponent(playersParam).split(',').map(s => s.trim()).filter(Boolean)
-  : [];
+  : []; // may be replaced by Firestore roster below
 
 function toVoterKey(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -567,6 +567,21 @@ buildGrid();
 buildNameField();
 
 if (localStorage.getItem(SURVEY_ID + '_voted')) showResults();
+
+// Load roster from Firestore and upgrade to dropdown if found
+getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', 'players'))
+  .then(snap => {
+    const players = snap.exists() ? (snap.data().players ?? []) : [];
+    if (players.length > 0) {
+      rosterNames.length = 0;
+      players.forEach(n => rosterNames.push(n));
+      const container = document.getElementById('nameField');
+      if (container) container.innerHTML = '';
+      buildNameField();
+      updateDropdownVotedState();
+    }
+  })
+  .catch(() => {});
 </script>
 </body>
 </html>

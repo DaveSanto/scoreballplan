@@ -4,6 +4,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../../src/firebase/config';
 import { useApp } from '../../../src/store/AppContext';
 
 const BASE_URL = 'https://scoreball.santopietro.com/surveys';
@@ -35,6 +37,12 @@ export default function SurveyScreen() {
   async function openSurvey() {
     if (!url || opening) return;
     setOpening(true);
+    if (playerNames.length > 0 && id) {
+      await setDoc(
+        doc(db, 'surveys', id, 'rosters', 'players'),
+        { players: playerNames, updatedAt: serverTimestamp() }
+      ).catch(() => {});
+    }
     await WebBrowser.openBrowserAsync(url, {
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.FORM_SHEET,
     });
