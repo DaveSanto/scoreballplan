@@ -19,8 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Share } from 'react-native';
 import { useApp } from '../../../../src/store/AppContext';
 import { useAuth } from '../../../../src/store/AuthContext';
+import { createTeamInvite } from '../../../../src/firebase/db';
 import { ALL_POSITIONS, Handedness, Player, Position } from '../../../../src/types';
 import { parseCsv, CSV_TEMPLATE_EXAMPLE, CsvRow } from '../../../../src/utils/csvImport';
+
+const APP_BASE_URL = 'https://scoreballplan.web.app';
 
 const PREF_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -95,6 +98,7 @@ export default function RosterScreen() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('batting');
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const fileInputRef = useRef<any>(null);
@@ -116,6 +120,25 @@ export default function RosterScreen() {
   function openEdit(player: Player) {
     setEditingPlayer(player);
     setEditModal(true);
+  }
+
+  async function shareInvite(player: Player) {
+    if (!player.email || !user?.uid || !team) return;
+    setSharingId(player.id);
+    try {
+      const { token } = await createTeamInvite(teamId, team.name, user.uid, player.email, 'editor');
+      const link = `${APP_BASE_URL}/invite/team/${token}`;
+      const message = `Join ${team.name} on ScoreBall:\n${link}`;
+      if (Platform.OS === 'web') {
+        window.open(`mailto:${player.email}?subject=Join ${encodeURIComponent(team.name)} on ScoreBall&body=${encodeURIComponent(message)}`);
+      } else {
+        await Share.share({ message });
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Could not create invite.');
+    } finally {
+      setSharingId(null);
+    }
   }
 
   async function confirmDelete(playerId: string) {
@@ -243,6 +266,8 @@ export default function RosterScreen() {
               }
             }}
             onClaimCancel={() => setClaimingId(null)}
+            sharing={sharingId === item.id}
+            onShare={() => shareInvite(item)}
             confirming={deletingId === item.id}
             onDeleteRequest={() => setDeletingId(item.id)}
             onDeleteConfirm={() => confirmDelete(item.id)}
@@ -319,6 +344,8 @@ function PlayerRow({
   onClaimConfirm,
   onGuardianConfirm,
   onClaimCancel,
+  sharing,
+  onShare,
   confirming,
   onDeleteRequest,
   onDeleteConfirm,
@@ -335,6 +362,8 @@ function PlayerRow({
   onClaimConfirm: () => void;
   onGuardianConfirm: () => void;
   onClaimCancel: () => void;
+  sharing: boolean;
+  onShare: () => void;
   confirming: boolean;
   onDeleteRequest: () => void;
   onDeleteConfirm: () => void;
@@ -350,6 +379,7 @@ function PlayerRow({
     !!userEmail && !!player.email &&
     userEmail.toLowerCase() === player.email.toLowerCase();
   const canLink = emailMatches && !player.claimedBy && !player.guardianId;
+  const showShareRow = isAdmin && !!player.email && !player.claimedBy;
   const showingInlineAction = confirming || claiming;
 
   return (
@@ -381,6 +411,17 @@ function PlayerRow({
             </View>
           )}
         </View>
+        {showShareRow && (
+          <View style={styles.emailRow}>
+            <Ionicons name="mail-outline" size={12} color="#aaa" />
+            <Text style={styles.emailText} numberOfLines={1}>{player.email}</Text>
+            <Pressable style={styles.shareBtn} onPress={onShare} disabled={sharing}>
+              {sharing
+                ? <ActivityIndicator size="small" color="#1a5c2e" style={{ width: 40 }} />
+                : <Text style={styles.shareBtnText}>Share</Text>}
+            </Pressable>
+          </View>
+        )}
         {confirming ? (
           <View style={styles.deleteConfirmRow}>
             <Text style={styles.deleteConfirmText}>Remove {player.name}?</Text>
@@ -423,6 +464,12 @@ function PlayerRow({
             <Pressable style={styles.claimBtn} onPress={onClaimRequest}>
               <Text style={styles.claimBtnText}>Link to me</Text>
             </Pressable>
+          )}
+          {isMe && (
+            <View style={styles.thisIsMeChip}>
+              <Ionicons name="checkmark-circle" size={12} color="#1a5c2e" />
+              <Text style={styles.thisIsMeText}>This is me</Text>
+            </View>
           )}
           {isAdmin && (
             <>
@@ -538,15 +585,24 @@ function PlayerModal({
             <Text style={styles.fieldLabel}>Jersey Number</Text>
             <TextInput style={styles.input} value={number} onChangeText={setNumber} placeholder="e.g. 7" keyboardType="number-pad" />
 
-            <Text style={styles.fieldLabel}>Email</Text>
+            <View style={styles.fieldLabelRow}>
+              <Text style={[styles.fieldLabel, { marginTop: 0, marginBottom: 0 }]}>Email</Text>
+              {player?.claimedBy && (
+                <View style={styles.lockedBadge}>
+                  <Ionicons name="lock-closed" size={10} color="#888" />
+                  <Text style={styles.lockedBadgeText}>Locked</Text>
+                </View>
+              )}
+            </View>
             <TextInput
-              style={styles.input}
+              style={[styles.input, player?.claimedBy ? styles.inputLocked : undefined]}
               value={email}
               onChangeText={setEmail}
               placeholder="player@email.com"
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              editable={!player?.claimedBy}
             />
 
             <Text style={styles.fieldLabel}>Phone</Text>
@@ -1217,6 +1273,19 @@ const styles = StyleSheet.create({
   },
   resChipText: { fontSize: 12, fontWeight: '600', color: '#888' },
   resChipTextActive: { color: '#1a1a1a' },
+
+  thisIsMeChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#edf6f0', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  thisIsMeText: { fontSize: 11, fontWeight: '600', color: '#1a5c2e' },
+
+  emailRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  emailText: { flex: 1, fontSize: 11, color: '#aaa' },
+  shareBtn: { borderWidth: 1.5, borderColor: '#1a5c2e', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  shareBtnText: { fontSize: 11, fontWeight: '600', color: '#1a5c2e' },
+
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginTop: 14 },
+  lockedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#f0f0ef', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  lockedBadgeText: { fontSize: 10, fontWeight: '600', color: '#888' },
+  inputLocked: { backgroundColor: '#f5f5f4', color: '#aaa' },
 });
 
 function resChipActive(res: ConflictResolution) {
