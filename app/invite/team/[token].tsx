@@ -127,10 +127,17 @@ export default function TeamInviteScreen() {
         )}
 
         {user && !isExpired && !isAlreadyHandled && isWrongEmail && (
-          <View style={styles.warningBox}>
-            <Text style={styles.warningText}>
-              This invite was not intended for you. Please contact your team admin for a new invite.
+          <View style={styles.welcomeBox}>
+            <Text style={styles.welcomeHeading}>Welcome to ScoreBall! ⚾</Text>
+            <Text style={styles.welcomeText}>
+              This invite was meant for someone else, but we're glad you're here. You can create your own team or set up a player profile to get started.
             </Text>
+            <Pressable style={styles.primaryBtn} onPress={() => router.replace('/(app)' as any)}>
+              <Text style={styles.primaryBtnText}>Create a Team</Text>
+            </Pressable>
+            <Pressable style={styles.ghostBtn} onPress={() => router.replace('/(app)' as any)}>
+              <Text style={styles.ghostBtnText}>Set Up a Player Profile</Text>
+            </Pressable>
           </View>
         )}
 
@@ -191,6 +198,9 @@ const styles = StyleSheet.create({
 
   warningBox: { backgroundColor: '#fff8f0', borderRadius: 10, padding: 14, marginTop: 8 },
   warningText: { fontSize: 14, color: '#e67e22', textAlign: 'center', fontWeight: '500' },
+  welcomeBox: { alignItems: 'center', gap: 12, marginTop: 8, width: '100%' },
+  welcomeHeading: { fontSize: 18, fontWeight: '800', color: '#1a1a1a', textAlign: 'center' },
+  welcomeText: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
 
   signInBox: { alignItems: 'center', gap: 12, marginTop: 12, width: '100%' },
   signInText: { fontSize: 14, color: '#888', textAlign: 'center' },
