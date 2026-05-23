@@ -530,6 +530,9 @@ window.showSurvey = function() {
   document.getElementById('resultsPanel').classList.remove('show');
 };
 
+window.showResults = showResults;
+window.resetRanking = resetRanking;
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
