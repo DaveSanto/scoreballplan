@@ -217,7 +217,7 @@
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, serverTimestamp }
+import { getFirestore, collection, doc, setDoc, onSnapshot, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const app = initializeApp({
@@ -234,8 +234,14 @@ const SURVEY_ID = 'ravenwood_brewers_hat';
 const votesCol = collection(db, 'surveys', SURVEY_ID, 'votes');
 
 // ── Name field (dropdown or text input) ───────────────────────────────────────
-const teamId = new URLSearchParams(window.location.search).get('teamId');
-let rosterNames = [];
+const playersParam = new URLSearchParams(window.location.search).get('players');
+const rosterNames = playersParam
+  ? decodeURIComponent(playersParam).split(',').map(s => s.trim()).filter(Boolean)
+  : [];
+
+function toVoterKey(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
 
 function buildNameField() {
   const container = document.getElementById('nameField');
@@ -264,6 +270,16 @@ function buildNameField() {
     input.addEventListener('input', updateSubmitBtn);
     container.appendChild(input);
   }
+}
+
+function updateDropdownVotedState() {
+  const sel = document.getElementById('voterName');
+  if (!sel || sel.tagName !== 'SELECT') return;
+  Array.from(sel.options).forEach(opt => {
+    if (!opt.value) return;
+    const voted = toVoterKey(opt.value) in liveVotes;
+    opt.textContent = voted ? `${opt.value} ✓` : opt.value;
+  });
 }
 
 function getVoterName() {
@@ -376,7 +392,7 @@ async function submitVote() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
 
-  const voterKey = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const voterKey = toVoterKey(name);
   try {
     await setDoc(doc(db, 'surveys', SURVEY_ID, 'votes', voterKey), {
       name,
@@ -401,6 +417,7 @@ document.getElementById('submitBtn').addEventListener('click', submitVote);
 onSnapshot(votesCol, (snap) => {
   liveVotes = {};
   snap.docs.forEach(d => { liveVotes[d.id] = d.data(); });
+  updateDropdownVotedState();
   if (document.getElementById('resultsPanel').classList.contains('show')) renderResults();
 }, (err) => {
   showError('Could not load live results. Check your connection.');
@@ -550,20 +567,6 @@ buildGrid();
 buildNameField();
 
 if (localStorage.getItem(SURVEY_ID + '_voted')) showResults();
-
-// Upgrade to dropdown if roster loads from Firestore
-if (teamId) {
-  getDoc(doc(db, 'surveys', SURVEY_ID, 'rosters', teamId))
-    .then(snap => {
-      if (snap.exists() && (snap.data().players ?? []).length > 0) {
-        rosterNames = snap.data().players;
-        const container = document.getElementById('nameField');
-        if (container) container.innerHTML = '';
-        buildNameField();
-      }
-    })
-    .catch(() => {});
-}
 </script>
 </body>
 </html>
