@@ -34,6 +34,7 @@ export default function TeamInviteScreen() {
 
   async function handleAccept() {
     if (!invite || !user) return;
+    if (invite.invitedEmail && user.email?.toLowerCase() !== invite.invitedEmail.toLowerCase()) return;
     setAccepting(true);
     try {
       await acceptTeamInvite(invite.id, user.uid, invite.teamId);
@@ -91,6 +92,8 @@ export default function TeamInviteScreen() {
 
   const isExpired = invite?.expiresAt?.toDate?.() < new Date();
   const isAlreadyHandled = invite?.status !== 'pending';
+  const isWrongEmail = !!user && !!invite?.invitedEmail &&
+    user.email?.toLowerCase() !== invite.invitedEmail.toLowerCase();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -123,7 +126,18 @@ export default function TeamInviteScreen() {
           </View>
         )}
 
-        {user && !isExpired && !isAlreadyHandled && (
+        {user && !isExpired && !isAlreadyHandled && isWrongEmail && (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              This invite is for {invite?.invitedEmail}. You're signed in as {user.email}.
+            </Text>
+            <Text style={[styles.warningText, { marginTop: 6 }]}>
+              Sign in with the correct account to accept.
+            </Text>
+          </View>
+        )}
+
+        {user && !isExpired && !isAlreadyHandled && !isWrongEmail && (
           <View style={styles.actions}>
             <Text style={styles.signedInAs}>Signed in as {user.email}</Text>
             <Pressable
