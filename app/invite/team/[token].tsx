@@ -102,11 +102,19 @@ export default function TeamInviteScreen() {
           <Ionicons name="baseball-outline" size={36} color="#1a5c2e" />
         </View>
 
-        <Text style={styles.inviteLabel}>You've been invited to join</Text>
-        <Text style={styles.teamName}>{invite?.teamName}</Text>
-        <Text style={styles.sub}>
-          as a {invite?.role === 'editor' ? 'co-captain / editor' : invite?.role === 'member' ? 'team member' : 'viewer (read-only)'}
-        </Text>
+        {isWrongEmail ? (
+          <Text style={styles.sub}>
+            This is an invite to <Text style={styles.bold}>{invite?.teamName}</Text>, but you may have either used a different email or been given the wrong link.
+          </Text>
+        ) : (
+          <>
+            <Text style={styles.inviteLabel}>You've been invited to join</Text>
+            <Text style={styles.teamName}>{invite?.teamName}</Text>
+            <Text style={styles.sub}>
+              as a {invite?.role === 'editor' ? 'co-captain / editor' : invite?.role === 'member' ? 'team member' : 'viewer (read-only)'}
+            </Text>
+          </>
+        )}
 
         {(isExpired || isAlreadyHandled) && (
           <View style={styles.warningBox}>
