@@ -181,7 +181,7 @@
 <div id="survey">
   <div class="instructions">
     <strong>Tap hats in order of preference</strong> — your favorite first, then second, and so on.
-    Rank all 6 to submit. Tap a ranked hat to remove it.
+    Rank all 7 to submit. Tap a ranked hat to remove it.
   </div>
 
   <div class="name-section">
@@ -199,6 +199,9 @@
   <div class="action-row">
     <button class="reset-btn" onclick="resetRanking()">Reset</button>
     <button class="submit-btn" id="submitBtn" disabled>Submit Ranking</button>
+  </div>
+  <div style="text-align:center;margin-top:14px;">
+    <button onclick="showResults()" style="background:none;border:none;color:#f5c842;font-size:0.85rem;cursor:pointer;opacity:0.7;text-decoration:underline;">📊 View current results</button>
   </div>
 </div>
 
@@ -380,6 +383,7 @@ async function submitVote() {
       ranking: [...ranking],
       votedAt: serverTimestamp(),
     });
+    localStorage.setItem(SURVEY_ID + '_voted', '1');
     showToast(`Ranking saved for ${name}! 🎉`);
     showResults();
   } catch (err) {
@@ -540,7 +544,9 @@ function showError(msg) {
 }
 
 buildGrid();
-buildNameField(); // always show text input immediately
+buildNameField();
+
+if (localStorage.getItem(SURVEY_ID + '_voted')) showResults();
 
 // Upgrade to dropdown if roster loads from Firestore
 if (teamId) {
