@@ -273,17 +273,26 @@ function updateSubmitBtn() {
 
 const HATS = [
   { id: 'hat1', label: '212 — Navy/Gold', sub: 'Richardson 212 Fitted',
-    img: 'https://richardson.picarioxpo.com/212_FINAL.pfs?1=1&width=600&height=356&p.tn=Navy.jpg,Navy.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg' },
+    img: 'https://richardson.picarioxpo.com/212_FINAL.pfs?1=1&width=600&height=356&p.tn=Navy.jpg,Navy.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg',
+    url: 'https://m2.richardsonsports.com/212.html' },
   { id: 'hat2', label: '212 — All Gold', sub: 'Richardson 212 Fitted',
-    img: 'https://richardson.picarioxpo.com/212_FINAL.pfs?1=1&width=600&height=356&p.tn=Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg' },
-  { id: 'hat3', label: '172 — Gold/White/Navy', sub: 'Richardson 172 Split Front',
-    img: 'https://richardson.picarioxpo.com/172_FINAL.pfs?1=1&width=600&height=356&p.tn=Gold.jpg,white.jpg,Navy.jpg,Gold.jpg,Navy.jpg,Navy.jpg,white.jpg,white.jpg,white.jpg' },
+    img: 'https://richardson.picarioxpo.com/212_FINAL.pfs?1=1&width=600&height=356&p.tn=Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Gold.jpg',
+    url: 'https://m2.richardsonsports.com/212.html' },
   { id: 'hat4', label: '185 — Solid Navy', sub: 'Richardson 185 Wool Blend',
-    img: 'https://richardson.picarioxpo.com/185_FINAL.pfs?1=1&width=600&height=356&p.tn=Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg' },
-{ id: 'hat6', label: '112 — White/Columbia Blue/Yellow', sub: 'Richardson 112 Trucker',
-    img: 'https://richardson.picarioxpo.com/112_FINAL.pfs?1=1&width=600&height=356&p.tn=White.jpg,Columbia%20Blue.jpg,Yellow_220.jpg,Yellow_220.jpg,White.jpg,Birch.jpg,Columbia%20Blue.jpg' },
+    img: 'https://richardson.picarioxpo.com/185_FINAL.pfs?1=1&width=600&height=356&p.tn=Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg',
+    url: 'https://m2.richardsonsports.com/185.html' },
+  { id: 'hat6', label: '112 — White/Columbia Blue/Yellow', sub: 'Richardson 112 Trucker',
+    img: 'https://richardson.picarioxpo.com/112_FINAL.pfs?1=1&width=600&height=356&p.tn=White.jpg,Columbia%20Blue.jpg,Yellow_220.jpg,Yellow_220.jpg,White.jpg,Birch.jpg,Columbia%20Blue.jpg',
+    url: 'https://m2.richardsonsports.com/112.html' },
   { id: 'hat7', label: '112 — Columbia Blue/White/Navy', sub: 'Richardson 112 Trucker',
-    img: 'https://richardson.picarioxpo.com/112_FINAL.pfs?1=1&width=600&height=356&p.tn=Columbia%20Blue.jpg,White.jpg,Navy.jpg,Navy.jpg,Columbia%20Blue.jpg,White.jpg,White.jpg' },
+    img: 'https://richardson.picarioxpo.com/112_FINAL.pfs?1=1&width=600&height=356&p.tn=Columbia%20Blue.jpg,White.jpg,Navy.jpg,Navy.jpg,Columbia%20Blue.jpg,White.jpg,White.jpg',
+    url: 'https://m2.richardsonsports.com/112.html' },
+  { id: 'hat8', label: 'PTS20 — Navy/Gold', sub: 'Richardson PTS20 Fitted (sized)',
+    img: 'https://richardson.picarioxpo.com/PTS20_FINAL.pfs?1=1&width=600&height=356&p.tn=Navy.jpg,Navy.jpg,Gold.jpg,Gold.jpg,Gold.jpg,Navy.jpg,Navy.jpg',
+    url: 'https://m2.richardsonsports.com/pts20.html' },
+  { id: 'hat9', label: 'PTS20 — Gold/Navy', sub: 'Richardson PTS20 Fitted (sized)',
+    img: 'https://richardson.picarioxpo.com/PTS20_FINAL.pfs?1=1&width=600&height=356&p.tn=Gold.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg,Navy.jpg',
+    url: 'https://m2.richardsonsports.com/pts20.html' },
 ];
 
 // ranking[i] = hatId at position i (0 = 1st choice); null if not yet assigned
@@ -300,9 +309,9 @@ function buildGrid() {
     card.id = 'card-' + hat.id;
     card.innerHTML = `
       <div class="rank-badge empty" id="badge-${hat.id}">?</div>
-      <img src="${hat.img}" alt="${hat.label}" loading="lazy" />
+      <img src="${hat.img}" alt="${hat.label}" />
       <div class="card-label">${hat.label}</div>
-      <div class="card-sub">${hat.sub}</div>
+      <div class="card-sub">${hat.sub} &nbsp;·&nbsp; <a href="${hat.url}" target="_blank" onclick="event.stopPropagation()" style="color:#f5c842;font-size:0.75rem;">details ↗</a></div>
       <div class="rank-hint" id="hint-${hat.id}">Tap to rank</div>`;
     card.onclick = () => toggleRank(hat.id);
     grid.appendChild(card);
